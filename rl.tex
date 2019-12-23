@@ -1,0 +1,188 @@
+\documentclass[12pt]{article}  
+
+\usepackage[boxruled,lined]{algorithm2e}
+%% \usepackage{booktabs}
+\usepackage{amsmath} 
+\usepackage{amsthm} 
+\usepackage{amsfonts} 
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage[T1]{fontenc}
+\usepackage{xparse} 
+\usepackage{bm}
+\usepackage{bbm} 
+\usepackage{color,soul} 
+\usepackage{framed}
+\usepackage[margin=0.5in]{geometry}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{mathtools}
+\usepackage{multicol}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tikz}
+\usepackage[normalem]{ulem}
+\usepackage{pgfplots}  
+\usepackage{pifont}
+\usetikzlibrary{positioning}
+\usetikzlibrary{calc}
+\usetikzlibrary{fit}
+\usetikzlibrary{shapes}
+\usetikzlibrary{patterns}
+\usetikzlibrary{decorations.pathreplacing}
+\newcommand\STAR{{\tikz{\node[draw,star,star point height=.7em,minimum size=1em,scale=0.35]{};} }}
+\newcommand{\Plus}{\mathord{\begin{tikzpicture}[baseline=0ex, line width=1, scale=0.13]
+\draw (1,0) -- (1,2); \draw (0,1) -- (2,1); \end{tikzpicture}}}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\DeclarePairedDelimiter{\floor}{\lfloor}{\rfloor}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\newcommand{\D}{\mathrm{d}}
+\SetKwInput{KwInput}{Input}
+\SetKwInput{KwOutput}{Output}
+
+\begin{document}
+\renewcommand{\d}[1]{\ensuremath{\operatorname{d}\!{#1}}}
+
+\tableofcontents
+\newpage
+\section{Course Introduction}\vspace{.1pt} \hrule height 2pt \smallskip \renewcommand{\arraystretch}{1}
+\subsection{Motivating Reinforcement Learning}
+Suppose you want to program a robot to collect cans that are laying around a messy lab. To do this naively, we'd first need to build a computer vision system that recognizes cans, obstacles, and people. Then, we'd need to construct a map of the environment and figure out how we can instruct the robot to learn \emph{where} it is in the map, i.e. the robot will need to localize itself. There's additional requirements as well, but let's consider an alternative. What if we were to use \emph{reinforcement learning}? In this example, the reward can be the number of cans the robot collects, and the agent could simply learn to collect as many cans as possible through trial and error. In principle, it wouldn't even need a map of the lab. In the event that a new type or color of can starts appearing in the lab, a reinforcement learning system would still learn to pick these up, whereas a pre-learned perception system would fail in this scenario. In order to make reinforcement learning work, we'll need (i) a good \emph{function approximation} if we want to learn from an on-board camera, as well as (ii) \emph{planning} so that the agent can revisit parts of the lab it hasn't been to in a while to check for new cans. The \emph{reward function} can simply be the total count of the number of cans collected at the \emph{end} of each day; this requires a TD-based algorithm to handle the delayed feedback.
+
+\paragraph{Course Introduction} The promise of reinforcement learning is that an agent can figure out how the world works simply by trying things and seeing what happens. What's the difference between supervised learning, reinforcement learning, and unsupervised learning?
+\begin{itemize}
+\item In \emph{supervised learning}, we assume the learner has access to labeled   examples giving the correct answer.
+\item In \emph{reinforcement learning}, the reward gives the agent an idea of how good or bad its recent actions were. While supervised learning is kind of like having a teacher that tells you what the correct \emph{answer} is, reinforcement learning is kind of like having someone tell you what good \emph{behavior} is, but they can't tell you exactly how to do it.
+\item In \emph{unsupervised learning}, we try to extract the underlying structure of the data, i.e. data representation. Note that it's possible to use unsupervised learning to construct representations that make a supervised or RL system more performant.
+\end{itemize}
+
+\paragraph{Online Learning}
+In RL, we focus on the problem of learning while interacting with an ever changing world. We do not expect our agents to compute a good behavior and then execute that behavior in an open-loop fashion. Instead, we expect our agents to sometimes make mistakes and refine their understanding as they go. The world is not a static place: we get injured, the weather changes, and we encounter new situations in which our goals change.  An agent that immediately integrates its most recent experience should do well especially compared with ones that attempt to simply perfectly memorize how the world works.
+The idea of learning \emph{online} is an extremely powerful if not defining feature of RL. Even the way that this course introduces concepts tries to reflect this fact. For example, bandits and exploration will be covered before we derive inspiration from supervised learning. Getting comfortable learning \emph{online} requires a new perspective. Today, RL is evolving at what feels like breakneck pace: search companies, online retailers, and hardware manufacturers are exploring RL solutions for their day to day operations. There are convincing arguments to be made that such systems can be more efficient, save money, and keep humans out of risky situations. As the field evolves, it's important to focus on the fundamentals. E.g. DQN combines Q-learning, neural networks, and experienced replay. This course covers the fundamentals used in modern RL systems. By the end of the course, you'll implement a neural network learning system to solve an infinite state control task. We'll start with the multi-armed bandit problem: this introduces us to estimating values, incremental learning, exploration, non-stationarity, and parameter tuning.
+
+\section{Multi-armed Bandits}
+What distinguishes RL from other types of learning is that it uses training information that \emph{evaluates} the actions rather than \emph{instructs} by giving correct actions. Because we do not know what the \emph{correct} actions are, this creates the need for active exploration to search for good behavior.
+\begin{itemize}
+\item Purely evaluative feedback indicates how good the action was, but not   whether it was the best or the worst action possible.
+\item Purely instructive feedback indicates the correct action to take, independently of the action actually taken.
+\end{itemize}
+To emphasize: evaluative feedback depends \emph{entirely} on the action taken, whereas instructive feedback is \emph{independent} of the action taken.
+To start, we study the evaluative aspect of reinforcement learning in a simplified setting: one that does not involve learning to act in more than one situation. This is known as a \emph{non-associative} setting. We can then take one-step closer to the full RL problem by discussing what happens when the bandit problem becomes associative, i.e. when actions are taken in more than one situation.
+
+\subsection{A $k$-armed Bandit Problem}
+SUppose you are faced repeatedly with a choice among $k$ different options, or actions. After each choice you receive a numerical reward chosen from a \emph{stationary} probability distribution that depends on the action you selected. The objective is to maximize the expected total reward over some time-period e.g. $1,000$ action selections or \emph{time-steps}. Through repeated actions, we aim to maximize reward by concentrating actions on the best levers.
+
+\paragraph{The expected reward of an action} In the $k$-armed bandit problem, each of the $k$ actions has an expected reward given that the action is selected; we refer to this quantity as the \emph{value} of an action. Denote the action selected at time step $t$ as $A_t$, and the corresponding reward as $R_t$. The value of an arbitrary action $a$, denoted by $q_*(a)$, is the expected reward given that $a$ is selected:
+\[
+  q_*(a) = \mathbb E \left[ R_t | A_t = a \right]
+\]
+If we knew the value of each action, the solution to the $k$-armed bandit problem is trivial: simply always select the action with highest value. But, we don't know the action values with certainy, instead we only have estimates: denote by $Q_t(a)$ the estimated value of action $a$ at time step $t$. We hope that $Q_t(a) \approx q_*(a)$.
+
+\paragraph{Greedy actions} Suppose we maintain estimates of the action values. At any arbitrary time step, there is at least one action whose estimated value is greatest: these are called our \emph{greedy} actions. Selecting one of these is akin to \emph{exploiting} our current knowledge of the values of the actions. If we instead select a non-greedy action, then it is said we are \emph{exploring}, because this enables us to improve our estimate of the non-greedy action's value. Although exploitation is the obvious thing to do in a one-shot game, exploration may produce a greater total reward in the long run. Since it's not possible to both explore and to exploit with any single action selection, we often refer to a ``conflict'' between these strategies.
+
+\paragraph{Balancing exploit-explore} In any specific case, whether it is better to explore or exploit depends in a complex way on the precise values of the estimates, their respective uncertainties, and the number of remaining time steps. There are sophisticated methods for balancing exploit-explore for particular formulations of the $k$-armed bandit and related problems, but most of these methods make strong assumptions about stationarity and prior knowledge that is often violated in practice. In this course, we focus not on an optimal balance between exploration and exploitation, but instead we worry about simply balancing them at all.
+
+\subsection{Action-value Methods}
+Let's consider methods for estimating the values of actions and for using these estimates to make subsequent action selection decisions; we collectively call these \emph{action-value} methods. We defined the true value of a reward as the mean reward when that action is selected, so it is natural to estimate this by averaging rewards actually received:
+\begin{equation}
+  \label{eq: sampleaveragemethodforactionvalue}
+  Q_t(a) \coloneqq \frac{\textrm{sum of rewards when } a \textrm{ taken prior to } t}{\textrm{number of times } a \textrm{ taken prior to } t} = \frac{\sum_{i=1}^{t-1} R_i \cdot \mathbbm 1_{A_i = a}}{\sum_{i=1}^{t-1} \mathbbm 1_{A_i = a}}.
+\end{equation}
+Note that if the denominator is zero, we may instead define $Q_t(a)$ as some default value e.g. zero. Note that as the denominator tends to infinity, by the weak law of large numbers, $Q_t(a) \overset{p}{\longrightarrow} q_*(a)$, i.e. the sample mean converges in probability to the population mean. Equation
+\ref{eq: sampleaveragemethodforactionvalue} defines a \emph{sample-average} method for estimate action values.
+
+\paragraph{An action-selection rule} The simplest action-select rule is to chose among the set of actions with the highest estimated value. If there is more than one, we may select among them in an arbitrary way.
+\[
+A_t \coloneqq \argmax_a Q_t(a).
+\]
+Greedy action selection exploits our current knowledge to maximize immediate reward, and doesn't spend any time sampling seemingly inferior actions to see if they indeed may be better.
+
+\paragraph{$\epsilon$-greedy Methods}
+One alternative is to behave greedily most of the time, but every once in a while, say with probability $\epsilon$, to select randomly from among all the actions with equal probability, independently of the action-value estimates. This forms a class of $\epsilon$-greedy methods. An obvious advantage here is that in the limit as the number of steps increases, all actions will be sampled an infinite number of times,\footnote{To see this, realize that with an $\epsilon$-greedy method each action has probability at least $\epsilon > 0$ of being chosen at each time-step. For an arbitrary action $a$, the expected number of times we sample the action is given by $\sum_{t=1}^{\infty} \underbrace{\Pr(A_i = a)}_{\geq \epsilon}$ which diverges to $\infty$.} and this ensures that $Q_t(a) \overset{p}{\longrightarrow} q_*(a)$ for each action. Whence, the probability of selecting the optimal action converges to greater than $1-\epsilon$, i.e. to near certainty.\footnote{The reason for this last statement is quite obvious. Our strategy is to choose $A_t = \argmax_a Q_t(a)$ with probability $1-\epsilon$ and to sample among all possible actions with probability $\epsilon$, i.e. we choose $A_t$ with probability $1-\epsilon + \frac{\epsilon}{|\mathcal A|} > 1 - \epsilon$. By weak law of large numbers, in the limit we will have estimated each value precisely and so we have estimated the ordering of $Q_t(a)$ over all possible $a$, and so we are indeed selecting the optimal action with probability strictly greater than $1-\epsilon$.}
+
+\subsection{The 10-armed Testbed} We propose a testbest on which to assess the relative effectiveness of the greedy and $\epsilon$-greedy action-value methods. Here, our $k$-armed bandit problem is for $k=10$. We replicate across $B$ bandit problems (e.g. $2,000$): for each bandit problem, the action values $q_*(a)$ are selected from a standard normal distribution; then, the reward for each action
+is drawn from a normal distribution with unit variance and mean $q_*(a)$. For any learning method, we can measure its performance and behavior as it improves with experience for e.g. 1,000 time steps when applied to one instance of the bandit problem. Repeating for $B$ runs, each with a different bandit problem, we can obtain a measure of the learning algorithms average behavior.
+
+\paragraph{Advantages of $\epsilon$-greedy methods} It depends on the task. If we have noisy rewards (i.e. they are drawn from a distribution with high variance), then it will take \emph{more} exploration to find the optimal action, and so we would expect the $\epsilon$-greedy method to fare better relative to the greedy method. If the reward variances are zero, then the greedy method would know the true value of each action aftery trying it once; in this case the greedy algorithm can quickly find the optimal action and then never explore. However, suppose we relax the problem a bit: if the bandit task is non-stationary, i.e. the true values of the actions evolve over time, then exploration is \emph{required} even in the deterministic case to ensure that one of the non-greedy actions has not changed to become better than the greedy one.
+
+\subsection{Incremental Implementation} The action-value methods discussed so far all estimate action values as sample averages of observed rewards. How can we compute these efficiently? In particular, we want a running average that gets updated with constant memory and constant work required per update. To simplify notation let us concentrate on a single action. Let $R_i$ denote the reward received after the $i$th selection \emph{of this action}, and let $Q_n$ denote the estimate of its action value after it has been selected $n-1$ times, i.e.
+\[
+  Q_n \coloneqq \frac{R_1 + R_2 + \ldots + R_{n-1}}{n-1}.
+\]
+Note that a naive implementation would require more and more memory as more rewards are encountered. Instead, realize that given $Q_n$ and the $n$-th reward $R_n$, the new average of all $n$ rewards can be computed by
+\begin{align}
+  Q_{n+1} &= \frac{1}{n} \sum_{i=1}^n R_i &\textrm{definition of } Q_{n+1}\nonumber \\
+          &= \frac{1}{n} \left( R_n + \sum_{i=1}^{n-1} R_i \right) &\textrm{breaking apart summation}\nonumber  \\
+          &= \frac{1}{n} \left(R_n + \frac{n-1}{n-1} \sum_{i=1}^{n-1} R_i\right) &\substack{\textrm{multiplying by 1} \\ \textrm{to make an average appear}}\nonumber    \\
+          &= \frac{1}{n} \left(R_n + \left(n-1\right) Q_n \right) &\textrm{By definition of } Q_n \nonumber  \\
+          &= \frac{1}{n} \left(R_n + nQ_n - Q_n \right) &\textrm{factoring out terms}\nonumber  \\
+  \label{eq: incrementalimplementation}
+          &= Q_n + \frac{1}{n} \left[R_n - Q_n \right] &\textrm{algebraic simplification}
+\end{align}
+What's nice is that \ref{eq: incrementalimplementation} holds even for $n=1$, in which case we get that $Q_2 = R_1$ for arbitrary $Q_1$. Notice that we only have to store $Q_n$ and $n$, and the perform the work required by \ref{eq: incrementalimplementation} at each time step. What's interesting about this update rule is that it actually reoccurs frequently throughout this book:
+\[
+  \texttt{NewEstimate} \gets \texttt{OldEstimate} + \texttt{StepSize} \left[ \underbrace{\texttt{Target} - \texttt{OldEstimate}}_{\textrm{\emph{error}}} \right]
+\]
+The expression $\texttt{Target} - \texttt{OldEstimate}$ is an \emph{error} in our estimate which is reduced by taking a step towards the ``target'', which is presumed to indicate a desireable direction in which to move albeit may be subject to noise. In the case of our sample-average action-value method, the target is the $n$-th reward.
+\paragraph{Step-size parameter} Note that there is a parameter \texttt{StepSize} that appears in \ref{eq: incrementalimplementation} which can depend upon the time step. In processing the $n$-th reward for action $a$, the sample-average action-value method uses the step size parameter $\frac{1}{n}$. In general, we denote the step size parameter by $\alpha_t(a)$.
+\paragraph{A simple bandit algorithm} We now write out pseudo-code for a complete bandit algorithm using incremental updates for our sample-averages and an $\epsilon$-greedy action selection strategy.
+\begin{algorithm}
+  \For{$a = 1, \ldots, k$}{
+    $Q(a) \gets 0$ \\
+    $N(a) \gets 0$
+  }
+  \While{True}{
+    $A \gets \begin{cases}\argmax_a Q(a) &\textrm{ with probability } 1-\epsilon \hspace{15pt} (*\textrm{breaking ties randomly}) \\ \textrm{random action} &\textrm{ with probability } \epsilon     \end{cases}$ \\
+$R \gets \texttt{Bandit}(A)$ \\
+$N(A) \gets N(A) + 1$ \\
+$Q(A) \gets Q(A) + \frac{1}{N(A)} \left[R - Q(A) \right]$
+}
+\caption{A simple $\epsilon$-greedy $k$-armed bandit algorithm}
+\end{algorithm}
+Here, the function $\texttt{Bandit}(\cdot)$ accepts an action as argument and returns a corresponding reward.
+\subsection{Tracking a Nonstationary Problem using Exponentially Weighted Moving Averages} The sample-average action-value methods described so far are only appropriate for stationary bandit problems, i.e. ones in which the reward probabilities don't change over time. In cases of non-stationarity, it makes sense to give more weight to recent rewards than to long-past rewards. One of the ways to accomplish this is by using a \emph{constant} step size parameter. For example we can change \ref{eq:   incrementalimplementation} to something like
+\begin{equation}
+  \label{eq: incrementalupdateweightedaverage}
+  Q_{n+1} \coloneqq Q_n + \alpha \left[ R_n - Q_n \right]
+\end{equation}
+where the step size $\alpha \in (0, 1]$ is constant. Realize that this results in $Q_{n+1}$ being a weighted average of past rewards, given an initial estimate $Q_1$:
+\begin{align}
+  Q_{n+1} &= Q_n + \alpha \left[R_n - Q_n \right] &\textrm{by equation \ref{eq: incrementalupdateweightedaverage}}\nonumber \\
+          &= \alpha R_n + \left(1-\alpha\right) Q_n &\textrm{re-arranging terms} \nonumber \\
+          &= \alpha R_n + \left(1-\alpha\right) \left[\alpha R_{n-1} +             (1-\alpha)Q_{n-1}\right] &\substack{\textrm{substituting for } Q_n \\ \textrm{ based on pattern observed above}} \nonumber \\
+          &= \alpha R_n + (1-\alpha)\alpha R_{n-1} + (1-\alpha)^2 Q_{n-1} &\textrm{distributing } (1-\alpha) \nonumber \\
+          &= \alpha R_n + (1-\alpha)\alpha R_{n-1} + (1-\alpha)^2 \alpha R_{n-2}             + \ldots + (1-\alpha)^{n-1} \alpha R_1 + (1-\alpha)^n Q_1 &\textrm{based on pattern above} \nonumber  \\
+          &= (1-\alpha)^n Q_1 + \sum_{i=1}^{n} \alpha (1-\alpha)^{n-i} R_i. \label{eq: expoweightedaveragenonstationaryproblem}
+\end{align}
+Note that the sum of the weights is given by $(1-\alpha)^n + \sum_{i=1}^n \alpha (1-\alpha)^{n-i} = 1$. Note that crucially, the weight $\alpha(1-\alpha)^{n-i}$ given to the reward $R_i$ depends on how many rewards ago, $n-i$, that it was observed. Since $\alpha \in (0,1]$, the quantity $1-\alpha < 1$, thus the weight given to $R_i$ decreases as the number of intervening rewards increases. In fact, the weight decays exponentially according to the exponent on $1-\alpha$.\footnote{If $1-\alpha=0$, then all the weight goes to the very last   reward $R_n$, because of the convention that $0^0=1$.}
+
+\paragraph{Varying Step-Size Parameter from step-to-step} Let $\alpha_n(a)$ denote the step-size parameter used to process the reward received after the $n$-th selection of action $a$. The choice of $\alpha_n(a) = \frac{1}{n}$ results in the sample-average action-value strategy, which is guaranteed to converge to the true action-values by the weak law of large numbers. But, convergence isn't guaranteed for all choices of the sequence $\{\alpha_n(a)\}$. To ensure convergence with probability 1, we require that
+\begin{equation}
+  \sum_{n=1}^{\infty} \alpha_n(a) = \infty \hspace{25pt} \textrm{ and } \hspace{25pt} \sum_{n=1}^{\infty} \alpha_n^2(a) < \infty.
+\end{equation}
+The first condition is required to guarantee that the steps are large enough to eventually overcome any initial conditions (i.e. that we revisit actions infinitely many times), and the second condition guarantees that eventually, the step sizes become small enough to assure convergence. Note that both conditions are met for the sample-average case of $\alpha_n(a) = \frac{1}{n}$, but \emph{not} for the case of the constant step size parameter $\alpha_n(a) = \alpha$. In the latter case, the second condition isn't met, indicating that the estimates may never completely converge but instead continue to vary in response to the most recently received rewards; this is actually \emph{desireable} in the nonstationary environment.
+
+\subsection{Optimistic Initial Values} Our methods discussed thus far depend to some extent on initial action-value estimates $Q_1(a)$, i.e. we are \emph{biased} by our initial estimates. For sample-average methods, the bias dissappears once all actions have been selected at least once. But, for methods with constant $\alpha$, the bias is permanent albeit decreasing over time as given by equation \ref{eq: expoweightedaveragenonstationaryproblem}. Although this kind of bias can sometimes be helpful, the downside is that the initial estimates become a set of parameters that must be picked by the user, if only to set them all to zero. The upside is that they provide an easy way to encode prior knowledge about what levels of rewards can be expected.
+
+\paragraph{Encouraging exploration through large initial action values} Suppose that instead of setting initial action valus to zero in the 10-arm testbed, that we instead set them to $+5$. Note that based on our simulation we drew $q_*(a)$ from a standard normal, and so an initial estimate of $+5$ is wildly optimistic. What happens is that whichever action(s) are initially selected, the reward will always be less than the initial estimates and the algorithm will be encouraged to continue exploring all possibilities at least once. The system does a fair bit of exploration even if the greedy action-value strategy is employed! This technique can be particularly effective on stationary problems: initially the optimistic method performs worse than $\epsilon$-greedy because it explores more often, but eventually it performs \emph{better} because its exploration decreases with time. Note that the method is ill-suited to nonstationary problems since the drive for exploration is temporary.
+
+\subsubsection{Unbiased constant-step-size trick} Sample averages are not satisfactory because they do not perform well on nonstationary problems. Consider a step size of
+\[
+  \beta_n = \alpha / \bar{o}_n,
+\]
+to process the $n$-th reward for a particular action, where $\alpha > 0$ is a conventional constant step size, and $\bar{o}_n$ is a trace of one that starts at 0:
+\begin{align*}
+  \bar{o}_n &\coloneqq \bar{o}_{n-1} + \alpha(1-\bar{o}_{n-1}) &\textrm{for } n \geq 0, \textrm{ with } \bar{0}_0 = 0.
+\end{align*}
+\subsection{Upper-confidence bound action selection}
+We require exploration since there is always uncertainty about the accuracy of our action-value estimates. Greedy actions have been defined as the set of actions which look best at present, but it's possible that other actions could be better. The $\epsilon$-greedy action selection method forces the non-greedy actions to be tried, but indiscriminately, with no preference for those that are near greedy or particularly uncertain. Wouldn't it be nice if we could select among the non-greedy actions according to their potential for actually being optimal, taking into account both how close their estimates are to being maximal and the uncertainties in those estimates? One effective method is upper-confidence bound action selection:
+\[
+  A_t \coloneqq \argmax_a \left[ Q_t(a) + c \sqrt{\frac{\ln t}{N_t(a)}}
+  \]
+  where $c>0$ controls the degree of exploration If $N_t(a) = 0$ we consider $a$ to be a maximizing action. The fundamental idea is that the square root term is a measure of uncertainty or variance in the estimate of $a$'s value. The quantity being maximized over is an upper bound on the true value of action $a$, with $c$ determining the confidence level. Each time some $a$ is selected, its uncertainty is presumably reduced: $N_t(a)$ increments, and as it appears in the denominator, the uncertainty term decreases. On the other hand, each time an action other than $a$ is selected, $t$ increases, but $N_t(a)$ doesn't, and because $t$ appears in the numerator the uncertainty estimate increases. The use of the natural logarithm means that the increases get smaller over time, but they are unbounded; i.e. all actions will eventually be selected, but actions with lower value estimates, or those that have already been selected frequently, will be selected with decreasing frequency over time.
+\end{document}
