@@ -213,5 +213,104 @@ Associative search tasks are often called \emph{contextual bandits} in the liter
 
 \paragraph{Thompson Sampling} There is a family of Bayesian methods which assume an initial distribution over the action values and then update the distributionexactly after each step (assuming that the true action values are stationary). In general, the update computations are complex, but for conjugate priors they are straightforward. One possibility is to then select actions at each step according to their \emph{posterior} probability of being the best action. This method, sometimes called \emph{posterior sampling} or \emph{Thompson sampling}, often performs similarly to the best of the distribution-free methods we've gone over so far. In the Bayesian setting, it's conceivable to compute the \emph{optimal} balance between explore/exploit. For any possible action, one can compute the probability of each possible immediate reward and the resultant posterior distributions over action values. This \emph{evolving} distribution becomes the \emph{information state} of the problem. Given a horizen of $T$ time-steps, one can consider all possible actions, all possible resulting rewards, all possible next actions, all next rewards, and so on for $T$ time steps. Given the assumptions, the rewards and the probabilities of each possible chain of events can be determined, and one can simply pick the best. The problem is computationally intractable, however, as the tree of possibilities grows exponentially.
 
+\section{Finite Markov Decision Processes}
+Suppose we have a rabbit who prefers carrots over broccoli, each having reward $+10$ and $+3$ respectively. In the first time step, the rabbit can move \emph{right} to get a carrot or left to get broccoli: clearly it prefers to move right to get the highest reward. But at a later time step the situation is reversed, where the rabbit can now move \emph{left} to get a carrot or right to get broccoli. Clearly the rabbit should take the action of moving left. Or, consider another example where on the other side of the carrot is a predator: now the rabbit should prefer to take the broccoli since it'll have a better chance of survival in the long run (what looks good in the short-term isn't always what's best in the long-term). Note that the $k$-armed bandit does not account for the sequential decision making process as described here.
+
+\paragraph{MDPs}
+The problem involves evaluative feedback, as in the case of bandits, but additionally there is an associative aspect of choosing different actions in different situations.  MDPs are a classical formalization of sequential decision making, where actions influence not only immediate rewards but also subsequent situations, or states, and through those future rewards. In MDPs we estimate the value $q_*(s,a)$ of each action $a$ in each state $s$, or we estimate the value
+$v_*(s)$ of each state given optimal action selections. In this new framework, the agent and environment interact with each other. At each time step, there is a set of possible states the agent can be in $S_t \in \mathcal S$, and there is correspondingly a (subset of) actions they make take $A_t \in \mathcal A(S_t)$.
+
+\paragraph{Dynamics of an MDP} As in bandits, the outcomes of our action-state pairs are stochastic and so we may use the language of probability. When the agent takes an action in a state, there are many possible next states and rewards. The transition dynamics function $P$ formalizeds this notion. Given a state $s$ and action $a$, $p$ instructs us of the joint probability of the next state $s'$ and reward are, i.e. $\Pr(s', r | s, a)$. In this course, we assume the set of states, actions, and rewards are finite, although we will learn about algorithms that can handle infinite and uncountable sets. Since $p$ is a probability distribution, it must be non-negative and its sum over all possible next states and rewards must equal one. I.e. $p : \mathcal S \times \mathcal R \times \mathcal S \times \mathcal A \to [0,1]$, and
+\[
+  \sum_{s' \in \mathcal S} \sum_{r \in \mathcal R} \Pr(s', r | s, a) = 1, \hspace{15pt} \forall s \in \mathcal S \hspace{5pt} a \in \mathcal A(s)
+\]
+Note that the future state and reward depend only on the current state and action. In writing our probability in this way, we have defined a Markov process, and it intuitively means that the present state is sufficient and that remembering earlier states or trajectories would not improve predictions about the future.
+
+\subsection{Returns and Episodes} An agents goal is to maximize the cumulative reward it receives in the long run. If the sequence of rewards received after time step $t$ is denoted by $R_{t+1}, R_{t+2}, \ldots$, each a random variable, then what precise aspect of this sequence do we wish to maximize? In general, we seek to maximize \emph{expected} return, where the return at time step $t$, denoted by $G_t$,
+is some specific function of the reward sequence. In the simplest case the return is the sum of rewards:
+\begin{equation}
+  \label{eq: sumofrewards}
+  G_t \coloneqq R_{t+1} + R_{t+2} + \ldots + R_T
+\end{equation}
+where $T$ is a final time step. This approach really only makes sense in applications where there is a notion of a final time step, i.e. when the agent-environment interaction naturally breaks into subsequences, which we call \emph{episodes}. Example episodes are plays of a game, trips through a maze, or any sort of repeated interaction; episodes end in a special \emph{terminal state}, followed by a reset to a standart starting state or to a sample from a standard distribution of starting states. No matter how the last episode finished, e.g. win or lose, the next episode begins independently of how the previous one ended.  Tasks with episodes of this kind are called \emph{episodic} tasks; in such tasks we sometimes distinguish the set of all non-terminal states $\mathcal S$ from the set of all states plus the terminal state, denoted by $\mathcal S^+$. Note that the time of termination $T$ is a random variable that varies from episode to episode. One example of an episodic task is a game of chess; it always ends in either a checkmate, draw, or resignation, and a single game constitutes an episode. Each game starts from the same start state with all pieces reset.
+
+\paragraph{Continuing Tasks} In many cases, the agent-environment interaction doesn't break naturally into identifiable episodes, but instead goes on continually without limit; e.g. a process-control task, or an application to a robot with a long life span. We call these \emph{continuing tasks}. The definition of return as in equation \ref{eq: sumofrewards} is problematic because the final time step would be $T =\infty$, and the return (which we are trying to maximize) could itself be divergent. For example, suppose an agent receives a reward of $+1$ at each time step. To address this issue, we use discounting.
+
+\paragraph{Discounting Returns} In this approach, the agent tries to select actions so that the sum of the discounted rewards it receives over the future is maximized. I.e. it selects $A_t$ to maximize the expected \emph{discounted   return}:
+\begin{equation}
+  \label{eq: discounted return}
+  G_t \coloneqq R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \ldots = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1},
+\end{equation}
+where $\gamma \in [0,1]$ is called the \emph{discount rate}. This rate determines the present value of future rewards: a reward received $k$ time steps in the future is worth only $\gamma^{k-1}$ times what it would be worth if it were received immediately. Note that if $\gamma < 1$, then our discounted reward in equation \ref{eq: discounted return} is convergent so long as the reward sequence $\{R_k\}$ is bounded. If $\gamma = 0$, the agent is myopic and only focuses on maximizing immediate reward: its objective becomes choose $A_t$ so as to maximize only $R_{t+1}$. If it happened to be the case that the agent's actions influenced \emph{only} the immediate reward, not future rewards as well, then a myopic agent could maximize \ref{eq: discounted return} by separately maximizing each immediate reward.  But, in general acting to maximize the immediate reward can reduce access to future rewards so that the return is reduced. On the other hand, as $\gamma \leadsto 1$, the return objective takes future rewards into account more strongly and the agent becomes farsighted. Note that
+\begin{align}
+  G_t &\coloneqq R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \gamma^3 R_{t+4}         + \ldots \nonumber \\
+      &= R_{t+1} + \gamma \left(R_{t+2} + \gamma R_{t+3} + \gamma^2 R_{t+4} +         \ldots \right) \nonumber \\
+      &= R_{t+1} + \gamma G_{t+1}.
+\end{align}
+This works for all time steps $t<T$, even if termination occurs at $t+1$, so long as we define $G_T = 0$. Even though our return \ref{eq: discounted return}
+is an infinite sequence, it is finite if the reward is non-zero and constant and if $\gamma < 1$. E.g. if the reward is a constant $+1$ then $G_t = \sum_{k=0}^{\infty} \gamma^k = \frac{1}{1-\gamma}$.
+
+\subsection{Examples of MDPs}
+The MDP framework can be used to formalize a wide variety of sequential decision-making problems.
+Consider our recycling robot which collects empty soda cans in an office environment: it can detect soda cans, pick them up using a gripper, and then drop them off in a recycling bin. The robot runs on a rechargeable battery, and its objective is to collect as many cans as possible. To formulate this problem as an MDP, we start with the states, actions, and rewards. Suppose the sensors can only distinguish between two levels of battery charge: \texttt{high} and \texttt{low}, and these represent the robot's state. In each state, the robot has three choices: it can search for cans for a fixed amount of time, it can remain stationary and wait for someone to bring it a can, or it can go to the charging station to recharge its battery. We'll only allow charging from low battery state since charging otherwise is pointless. Now, let us consider transition dynamics as per figure \ref{fig: mdprobotrecycler}.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle] (hi) at (0,0) {high};
+    \node[draw,circle] (lo) at (6,0) {low};
+    \path[<->] (hi) edge[bend right=90] (lo);
+    \draw[-] (hi) -- (3, -2.35) node[draw,circle,fill] (hi_search) {};
+    \node at (3,-2.75) {search};
+    \node[left=10mm of hi_search] (hilabel) {$\alpha, r_{\textrm{search}}$};
+    \node[right=10mm of hi_search] (lolabel) {$1-\alpha, r_{\textrm{search}}$};
+    \node[above=of hi, draw,circle, fill] (wait_hi) {};
+    \draw[-] (hi) -- (wait_hi) node[below right] {wait};
+    \path[->] (wait_hi) edge[bend right = 90] (hi) node[left = 2mm of wait_hi]     {$1,r_{\textrm{wait}}$};
+\node[above=of lo, draw,circle, fill] (search_lo) {};
+\draw[-] (lo) -- (search_lo);
+\node[above left = 1mm of search_lo] {search};
+    \draw[->] (search_lo) edge[bend left = 90] (lo) node[right = 2mm of     search_lo] {$\beta, r_{\textrm{search}}$};
+    \draw[->] (search_lo) edge[bend right = 20] (hi) node[below left = 1mm of         search_lo] {$1-\beta, r_{\textrm{rescued}}$};
+\draw[->] (lo) -- (hi);
+\node[draw,circle,fill] (recharge) at (3,0) {};
+\node[above=1mm of recharge] {recharge};
+\node at (1.5, 0.25) {$1,0$};
+\node[below right=1cm of lo,draw,circle,fill] (lo_wait) {};
+\node[below=1mm of lo_wait] {wait};
+\draw[-] (lo) -- (lo_wait);
+\path[->] (lo_wait) edge[bend right = 30] (lo);
+\node[above right = 1mm of lo_wait] {$1,r_{\textrm{wait}}$};
+  \end{tikzpicture}
+  \caption{\footnotesize The \emph{state} of the robot's battery is indicated by open nodes in the graph, demarcated by ``high'' and ``low''. Actions are denoted by coloured nodes, and an edge between a state-action pair indicates that it is possible to execute said action from the corresponding state. After taking an action we observe a reward, and also a state change with some specified probability; for each transition we indicate the probability of transition and also the reward as a comma separated tuple alongside the corresponding edge. Hypothetical reward values: $r_{\textrm{wait}} = 1$, $r_{\textrm{search}} = 10$, $r_{\textrm{rescued}} = -20$. In our problem, $\alpha, \beta \in [0,1]$ describe transition probabilities when searching from a high or low battery state respectively.}
+\label{fig: mdprobotrecycler}
+\end{figure}
+
+\paragraph{Extensibility of MDPs}
+The MDP framework is highly extensible, and can be used in many applications. States can be low-level sensory readings, for example, in the pixel values of the video frame. They could also be high-level such as object descriptions. Similarly, actions could be low level, such as the wheel speed of the robot, or they could be high level, such as ``go to the charging station''. Time steps can be very small or very large, for example they can be one millisecond or one month; they can either be fixed intervals of time or successive stages of decision making.
+
+\paragraph{Pick-and-place task} Suppose we want to use RL to control a robot arm in which the goal of the robot is to pick up objects and place them in a particular location. There are many ways we could formalize this task, but here's one. The \emph{state} could be the readings of the joint-angles and velocities. The \emph{actions} could be the voltages applied to each motor. The \emph{reward} could be $+100$ for successfully placing each object. But, we also want the robot to use as little energy as possible, so let's include a small negative reward corresponding to energy used, e.g. $-1$ for each unit of energy consumed.
+
+\paragraph{Reward functions} Consider a robot learning to walk. The reward could be proportional to the forward motion. Lurching forward clearly maximizes immediate reward, however this action causes the robot to fall over. If the robot instead maximizes total forward motion instead, it would walk quickly but carefully. To teach an agent how to escape from a maze, the reward might be $-1$ for each time step that passes prior to escape, encouraging the agent to escape as quickly as possible. For an agent learning to play checkers or chess, the natural rewards might be $+1$ for winning, $-1$ for losing, and $0$ for drawing and for all non-terminal positions. In a stock market, we can use monetary rewards to optimize: since buying actions cost dollars, selling actions generate dollars, and the trade-offs are quite simple.
+\begin{itemize}
+\item Goal rewarding encoding: define a state where the goal is achieved as   having $+1$ reward and all other states yield zero reward.
+\item Action penalty representation: penalize the agent with a $-1$ each step in which the goal has not been achieved.
+\end{itemize}
+Both these formulations achieve optimal behavior by reaching the goal, eventually. But, what the agent does along the way is subtly different. Goal rewarding encoding doesn't really encourage the agent to get to the goal with any sense of urgency, and action penalty representation runs into serious problems if there is some small probability of getting stuck and never reaching the goal. Both schemes can lead to big problems for goals with \emph{really} long horizons, e.g. consider encouraging an agent to win a Nobel Prize. Just giving an agent a reward for attaining the ultimate goal is quite a tough sell. Some intermediate rewards like doing well on a science test or earning tenure could make a difference in orienting the agent in the right direction.
+
+\subsection{The reward hypothesis} There are three ways to think about creating intelligent behavior.
+\begin{itemize}
+\item Give a man a fish. If we want a machine to be smart, we program it with the behavior we want it to have. But, as new problems arise, the machine won't be able to adapt to new circumstances. It requires us to always be there providing new programs.
+\item Teach a man to fish. This is supervised learning: provide training examples and the machine writes its own program to match those examples. It learns, so long as we have a way to provide training examples, our machine will be able to write its own programs, and that's progress. But situations change.
+\item Give a man a taste for fish. This is reinforcement learning. The idea is that we don't have to specify the mechanism for achieving the goal. We can just encode the goal and the machine can design its own strategy for achieving it.
+\end{itemize}
+\paragraph{Rewards are easy to define if there is an underlying common currency}
+The reward hypothesis states that goals can be thought of as maximization of the expected value of the cumulative sum of a received scalar reward signal. This suggests two main branches of research: (i) figure out what rewards agents should optimize, and (ii) design algorithms to maximize the expected cumulative reward. How can we define rewards? Sometimes its not natural: consider designing a reinforcement learning agent to control a thermostat. Turning on the heat or air conditioning costs energy, but not turning it on causes discomfort in the occupants, so there is no common currency. We could try translating both into dollars, but that's not so natural, e.g. ``how much are you willing to pay to move the temperature a little closer to your comfort zone?''.
+
+\paragraph{Ways of defining rewards}
+Programming is one common way of defining rewards for a learning agent: a person sits down and does the work of translating goals and behaviors into reward values. We can write a program that takes in states and outputs rewards. We can also specify rewards by example; one interesting version of this is inverse reinforcement learning. In IRL, a trainer demonstrates desired behavior, and the learner tries to figure out what rewards the trainer must have been maximizing that makes said behavior optimal. So whereas RL is about going from rewards to behaviors, IRL is about going from behaviors to rewards. Once identified by IRL, these rewards can be maximized in other settings, resulting in powerful \emph{generalization} between environments. One shortcoming of the reward hypothesis is that it's hard to use it to explain risk-averse behavior, in which an agent chooses actions that might not be best on average but instead minimize the chance of a worst case outcome.
+
+\paragraph{What if we want a balance of actions?}
+What about when the desired behavior isn't to do the best thing all the time but instead to do a bunch of things in some balance? Imagine a pure reward maximizing music recommendation system: it would figure out your favorite song and then play it for you all the time, and that's not what we want. Perhaps there are ways to expand the state space so that the reward for playing a song is scaled back if that song has been played recently. ``An animal gets a lot of value from drinking, but only if it's thirsty''.
 
 \end{document}
