@@ -348,8 +348,85 @@ Programming is one common way of defining rewards for a learning agent: a person
 What about when the desired behavior isn't to do the best thing all the time but instead to do a bunch of things in some balance? Imagine a pure reward maximizing music recommendation system: it would figure out your favorite song and then play it for you all the time, and that's not what we want. Perhaps there are ways to expand the state space so that the reward for playing a song is scaled back if that song has been played recently. ``An animal gets a lot of value from drinking, but only if it's thirsty''.
 
 \subsection{Policies and Value Functions} Almost all RL algorithms involve estimating \emph{value functions} - functions of states (or state-action pairs) that estimate \emph{how good} it is for the agent to be in a given state (or how good it is to perform a given action in a given state). Here, ``how good'' means expected cumulative future rewards. Because the rewards that the agent can expect to receive in the future depend on what actions it will take, value functions are defined with respect to particular ways of acting called policies.
+A \emph{policy} is a mapping from states to probabilities of selecting each possible action; critically, policies can only depend on the current state.
 
-\paragraph{Policies} A \emph{policy} is a mapping from states to probabilities of selecting each possible action. If the agent is following policy $\pi$ at time $t$, then $\pi(a|s)$ is the probability that $A_t = a$ if $S_t = s$. Like $p$, $\pi$ is an ordinary function; the $|$ reminds us that it defines a conditional probability distribution over $a \in \mathcal A(s)$ for each $s \in \mathcal S$. The \emph{value function} of a state $s$ under a policy $\pi$, denoted by $v_\pi(s)$, is the expected return when starting in $s$ and following $\pi$ thereafter. For MDPs, we can define this formally by
+\paragraph{Deterministic Policies} In their simplest form, a policy could be a deterministic mapping from states to actions; note that the same action could be selected from multiple states, and some actions may not be selected in any state. It's important that policies depend only on the state, it defines all the things relevant to take an action, and not other things like time.\footnote{For example, suppose we can take two actions: left or right. A valid policy could be: at each time step go left with probability 1/2 and right with probability 1/2. An alternative strategy that is \emph{not} a policy is to alternate between left and right steps; critically, the action chosen at each time step depends on something other than the state (in particular, the past action), and so this is \emph{not} a policy. If we believed that alternating actions between left and right would yield a higher return, then we could encode the last action as part of our state variable!} It's best to think of this as a requirement on the state, and not as a limitation on the agent. In MDPs, we assume that the state encodes all the information required for decision-making.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,rectangle,rounded corners=.55mm] (s0) at (0, 0) {$s_0$};
+    \node[draw,rectangle,rounded corners=.55mm] (s1) at (0,-1) {$s_1$};
+    \node[draw,rectangle,rounded corners=.55mm] (s2) at (0,-2) {$s_2$};
+    \draw (-0.75, -2.5) rectangle (0.75, 0.75);
+    \node at (0, 0.5) {States};
+    \node[draw,rectangle,rounded corners=.55mm] (a0) at (3, 0) {$a_0$};
+    \node[draw,rectangle,rounded corners=.55mm] (a1) at (3,-1) {$a_1$};
+    \node[draw,rectangle,rounded corners=.55mm] (a2) at (3,-2) {$a_2$};
+    \draw (2.25, -2.5) rectangle (3.75, 0.75);
+    \node at (3, 0.5) {Actions};
+    \path[->,purple] (s0) edge[bend left=10] (a1);
+    \path[->,purple] (s1) edge[bend left=10] (a0);
+    \path[->,purple] (s2) edge[bend left=10] (a0);
+  \end{tikzpicture}
+  \caption{\footnotesize We draw out a deterministic policy, which we denote by $\pi(s) = a$. In this example, the policy selects action $a_1$ in state zero, and action $a_1$ in states one and two. Notice that some actions are selected from more than one state, and that other actions are not selected at all.}
+\end{figure}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{|c | c|}
+    \hline
+    State & Action \\
+    \hline
+    $s_0$ & $a_1$ \\
+    \hline
+    $s_1$ & $a_0$ \\
+    \hline
+    $s_2$ & $a_0$ \\
+    \hline
+  \end{tabular}
+  \caption{\footnotesize A deterministic policy can also be represented by a table. Each row describes the action chosen by the policy $\pi$ in each state.}
+\end{table}
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \draw[step=1.0,black,thin] (0,0) grid (4, 2);
+    \node at (3.5, 1.5) {\scriptsize home};
+    \foreach \x in {0.5, 1.5} {
+      \node at (\x, 0.5) {$\longrightarrow$};
+      \node at (\x, 1.5) {$\longrightarrow$};
+    }
+    \node at (2.5, 0.5) {$\uparrow$};
+    \node at (2.5, 1.5) {$\longrightarrow$};
+    \node at (3.5, 0.5) {$\uparrow$};
+  \end{tikzpicture}
+  \caption{\footnotesize Consider a second deterministic policy in which an agent moves toward its home on a grid. The states correspond to the locations on the grid, and the actions move the agent up, down, left, and right. We've demarcated one possible policy using arrows. Each arrow tells the agent which direction to move in each state.}
+\end{figure}
+
+\paragraph{Stochastic Policies}
+In general, a policy assigns probabilities to each action in each state; i.e. multiple actions may be selected each with some non-zero probability. If the agent is following policy $\pi$ at time $t$, then $\pi(a|s)$ is the probability that $A_t = a$ if $S_t = s$. Like $p$, $\pi$ is an ordinary function; the $|$ reminds us that it defines a conditional probability distribution over $a \in \mathcal A(s)$ for each $s \in \mathcal S$. Note that because $\pi(a|s)$ defines a probability distribution, we require that (i) $\sum_{a \in \mathcal A(s)} \pi(a|s) = 1$ and (ii) $\pi(a|s) \geq 0$.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \draw[step=1.0,black,thin] (0,0) grid (4, 2);
+    \node at (3.5, 1.5) {\scriptsize home};
+    \foreach \x in {0.5, 1.5} {
+      \draw[->,dashed] (\x-.25, 0.5) -- (\x+.25, 0.5);
+      \draw[->,dashed] (\x, 0.5-.25) -- (\x, 0.5+.25);
+      \node at (\x, 1.5) {$\longrightarrow$};
+    }
+    \draw[->,dashed] (2.5-.25, 0.5) -- (2.5+.25, 0.5);
+    \draw[->,dashed] (2.5, 0.5-.25) -- (2.5, 0.5+.25);
+    \node at (2.5, 1.5) {$\longrightarrow$};
+    \node at (3.5, 0.5) {$\uparrow$};    
+  \end{tikzpicture}
+  \caption{\footnotesize Here, we have a stochastic policy. We've indicated the randomness by drawing two possible actions with dashed lines for some of our states. To be concrete, the lower-left states each select an action of ``up'' or ``right'' each with probability $1/2$. Notice that the stochastic policy will require the \emph{same} number of steps to reach the house as the deterministic policy previously shown.}
+\end{figure}
+
+
+The \emph{value function} of a state $s$ under a policy $\pi$, denoted by $v_\pi(s)$, is the expected return when starting in $s$ and following $\pi$ thereafter. For MDPs, we can define this formally by
 \begin{equation}
   \label{eq: statevalueforpolicypi}
   v_\pi(s) \coloneqq \mathbb E_{\pi} \left[ G_t | S_t = s \right] = \mathbb E_\pi \left[ \sum_{k=0}^{\infty} \gamma^k R_{t+k+1} | S_t = s \right], \hspace{24pt} \textrm{for all } s \in \mathcal S.
