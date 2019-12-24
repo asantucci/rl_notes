@@ -220,6 +220,27 @@ Suppose we have a rabbit who prefers carrots over broccoli, each having reward $
 The problem involves evaluative feedback, as in the case of bandits, but additionally there is an associative aspect of choosing different actions in different situations.  MDPs are a classical formalization of sequential decision making, where actions influence not only immediate rewards but also subsequent situations, or states, and through those future rewards. In MDPs we estimate the value $q_*(s,a)$ of each action $a$ in each state $s$, or we estimate the value
 $v_*(s)$ of each state given optimal action selections. In this new framework, the agent and environment interact with each other. At each time step, there is a set of possible states the agent can be in $S_t \in \mathcal S$, and there is correspondingly a (subset of) actions they make take $A_t \in \mathcal A(S_t)$.
 
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+  \foreach \x in {0, 1, 2, 3} {
+    \node[draw,circle] (s\x) at (\x*3, 0) {$S_{\x}$};
+  }
+  \foreach \x in {0, 1, 2} {
+    \node[draw,circle,fill] (inter\x) at (\x*3+3/2, 0) {};
+    \node[above left = 1mm of inter\x] {$A_\x$};
+  }
+  \node[above right = 1mm of inter0] {$R_{1}$};
+  \node[above right = 1mm of inter1] {$R_{2}$};
+  \node[above right = 1mm of inter2] {$R_{3}$};
+  \draw[->] (s0) -- (s1);
+  \draw[->] (s1) -- (s2);
+  \draw[->] (s2) -- (s3);
+  \node[right = 1mm of s3] {$\ldots$};
+\end{tikzpicture}
+\caption{\footnotesize Here we represent the sequential nature of an MDP. At each time step, the agent finds itself in a given state. It takes an action which results in some reward. The process then repeats itself (perhaps indefinitely).}
+\end{figure}
+
 \paragraph{Dynamics of an MDP} As in bandits, the outcomes of our action-state pairs are stochastic and so we may use the language of probability. When the agent takes an action in a state, there are many possible next states and rewards. The transition dynamics function $P$ formalizeds this notion. Given a state $s$ and action $a$, $p$ instructs us of the joint probability of the next state $s'$ and reward are, i.e. $\Pr(s', r | s, a)$. In this course, we assume the set of states, actions, and rewards are finite, although we will learn about algorithms that can handle infinite and uncountable sets. Since $p$ is a probability distribution, it must be non-negative and its sum over all possible next states and rewards must equal one. I.e. $p : \mathcal S \times \mathcal R \times \mathcal S \times \mathcal A \to [0,1]$, and
 \[
   \sum_{s' \in \mathcal S} \sum_{r \in \mathcal R} \Pr(s', r | s, a) = 1, \hspace{15pt} \forall s \in \mathcal S \hspace{5pt} a \in \mathcal A(s)
@@ -232,16 +253,19 @@ is some specific function of the reward sequence. In the simplest case the retur
   \label{eq: sumofrewards}
   G_t \coloneqq R_{t+1} + R_{t+2} + \ldots + R_T
 \end{equation}
-where $T$ is a final time step. This approach really only makes sense in applications where there is a notion of a final time step, i.e. when the agent-environment interaction naturally breaks into subsequences, which we call \emph{episodes}. Example episodes are plays of a game, trips through a maze, or any sort of repeated interaction; episodes end in a special \emph{terminal state}, followed by a reset to a standart starting state or to a sample from a standard distribution of starting states. No matter how the last episode finished, e.g. win or lose, the next episode begins independently of how the previous one ended.  Tasks with episodes of this kind are called \emph{episodic} tasks; in such tasks we sometimes distinguish the set of all non-terminal states $\mathcal S$ from the set of all states plus the terminal state, denoted by $\mathcal S^+$. Note that the time of termination $T$ is a random variable that varies from episode to episode. One example of an episodic task is a game of chess; it always ends in either a checkmate, draw, or resignation, and a single game constitutes an episode. Each game starts from the same start state with all pieces reset.
+where $T$ is a final time step. This approach really only makes sense in applications where there is a notion of a final time step, i.e. when the agent-environment interaction naturally breaks into subsequences, which we call \emph{episodes}. Example episodes are plays of a game, trips through a maze, or any sort of repeated interaction; episodes end in a special \emph{terminal state}, followed by a reset to a standart starting state or to a sample from a standard distribution of starting states. No matter how the last episode finished, e.g. win or lose, the next episode begins independently of how the previous one ended.  Tasks with episodes of this kind are called \emph{episodic} tasks; in such tasks we sometimes distinguish the set of all non-terminal states $\mathcal S$ from the set of all states plus the terminal state, denoted by $\mathcal S^+$. Note that the time of termination $T$ is a random variable that varies from episode to episode.
 
-\paragraph{Continuing Tasks} In many cases, the agent-environment interaction doesn't break naturally into identifiable episodes, but instead goes on continually without limit; e.g. a process-control task, or an application to a robot with a long life span. We call these \emph{continuing tasks}. The definition of return as in equation \ref{eq: sumofrewards} is problematic because the final time step would be $T =\infty$, and the return (which we are trying to maximize) could itself be divergent. For example, suppose an agent receives a reward of $+1$ at each time step. To address this issue, we use discounting.
+\paragraph{Examples of episodic tasks}
+One example of an episodic task is a game of chess; it always ends in either a checkmate, draw, or resignation, and a single game constitutes an episode. Each game starts from the same start state with all pieces reset. Another example is the case of an agent learning to play a video game, in which the player gets a point for collecting treasure blocks and dies when they touch an enemy. This game is clearly an episodic MDP: the agent tries to get a high score, collecting as many points as possible before the game ends. The state is an array of pixel values corresponding to the current screen. There are four actions: up, left, down, right. The agent gets a reward of $+1$ every time they collect a treasure block. An episode ends when the agent touches one of the enemies. Regardless of how the episode ends, the next episode begins in the same way, with the agent at the center of the screen with no enemies present.
+
+\subsection{Continuing Tasks} In many cases, the agent-environment interaction doesn't break naturally into identifiable episodes, but instead goes on continually without limit; e.g. a process-control task, or an application to a robot with a long life span. We call these \emph{continuing tasks}. The definition of return as in equation \ref{eq: sumofrewards} is problematic because the final time step would be $T =\infty$, and the return (which we are trying to maximize) could itself be divergent. For example, suppose an agent receives a reward of $+1$ at each time step. To address this issue, we use discounting.
 
 \paragraph{Discounting Returns} In this approach, the agent tries to select actions so that the sum of the discounted rewards it receives over the future is maximized. I.e. it selects $A_t$ to maximize the expected \emph{discounted   return}:
 \begin{equation}
   \label{eq: discounted return}
   G_t \coloneqq R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \ldots = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1},
 \end{equation}
-where $\gamma \in [0,1]$ is called the \emph{discount rate}. This rate determines the present value of future rewards: a reward received $k$ time steps in the future is worth only $\gamma^{k-1}$ times what it would be worth if it were received immediately. Note that if $\gamma < 1$, then our discounted reward in equation \ref{eq: discounted return} is convergent so long as the reward sequence $\{R_k\}$ is bounded. If $\gamma = 0$, the agent is myopic and only focuses on maximizing immediate reward: its objective becomes choose $A_t$ so as to maximize only $R_{t+1}$. If it happened to be the case that the agent's actions influenced \emph{only} the immediate reward, not future rewards as well, then a myopic agent could maximize \ref{eq: discounted return} by separately maximizing each immediate reward.  But, in general acting to maximize the immediate reward can reduce access to future rewards so that the return is reduced. On the other hand, as $\gamma \leadsto 1$, the return objective takes future rewards into account more strongly and the agent becomes farsighted. Note that
+where $\gamma \in [0,1]$ is called the \emph{discount rate}. This rate determines the present value of future rewards: a reward received $k$ time steps in the future is worth only $\gamma^{k-1}$ times what it would be worth if it were received immediately.\footnote{Intuitively, this makes sense: a dollar today is worth more to you than a dollar in a year.} Note that if $\gamma < 1$, then our discounted reward in equation \ref{eq: discounted return} is convergent so long as the reward sequence $\{R_k\}$ is bounded. If $\gamma = 0$, the agent is myopic and only focuses on maximizing immediate reward: its objective becomes choose $A_t$ so as to maximize only $R_{t+1}$. If it happened to be the case that the agent's actions influenced \emph{only} the immediate reward, not future rewards as well, then a myopic agent could maximize \ref{eq: discounted return} by separately maximizing each immediate reward.  But, in general acting to maximize the immediate reward can reduce access to future rewards so that the return is reduced. On the other hand, as $\gamma \leadsto 1$, the return objective takes future rewards into account more strongly and the agent becomes farsighted. Note that
 \begin{align}
   G_t &\coloneqq R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \gamma^3 R_{t+4}         + \ldots \nonumber \\
       &= R_{t+1} + \gamma \left(R_{t+2} + \gamma R_{t+3} + \gamma^2 R_{t+4} +         \ldots \right) \nonumber \\
@@ -249,6 +273,13 @@ where $\gamma \in [0,1]$ is called the \emph{discount rate}. This rate determine
 \end{align}
 This works for all time steps $t<T$, even if termination occurs at $t+1$, so long as we define $G_T = 0$. Even though our return \ref{eq: discounted return}
 is an infinite sequence, it is finite if the reward is non-zero and constant and if $\gamma < 1$. E.g. if the reward is a constant $+1$ then $G_t = \sum_{k=0}^{\infty} \gamma^k = \frac{1}{1-\gamma}$.
+
+\paragraph{Proof of convergence} Let's examine why it's the case that $G_t < \infty$ if $\gamma < 1$. Assume that $R_{\textrm{max}}$ is the maximum reward our agent can achieve at any time step. We can upper bound the return $G_t$ by replacing every reward with $R_{\textrm{max}}$, and since it's just a constant we can then pull it out of the sum. We're left with a (scaled) geometric series which converges since $\gamma < 1$:
+\begin{align*}
+  G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1} \leq \sum_{k=0}^\infty \gamma^k R_{\textrm{max}} = R_{\textrm{max}} \sum_{k=0}^\infty \gamma^k = R_{\textrm{max}} \frac{1}{1-\gamma}.
+\end{align*}
+
+\paragraph{Examples of Continuing tasks} Consider a smart thermostat which regulates the temperature of a building. This can be formulated as a continuing task since the thermostat never stops interacting with the environment. The state could be the current temperature, along with details of the situation like the time of day and the number of people in the building. There are just two actions: turn on the heater or turn it off. The reward can be $-1$ every time someone has to manually adjust the temperature and zero otherwise. To avoid negative reward, the thermostat would learn to anticipate the user's preferences. Another example is an agent scheduling jobs on a set of servers. Suppose we have three servers used  by reinforcement learning researchers to run experiments. Researchers submit jobs with different priorities to a single queue. The state is a number of free servers, and the priority to the job at the top of the queue. The actions are to reject or accept the job at the top of the queue if a server is free. Accepting the job runs it and yields a reward equal to the job's priority. Rejecting a job yields a negative reward proportional to the priority, and sends the job to the back of the queue. Note that the agent must be careful about scheduling low-priority jobs, since this could prevent high priority jobs from being scheduled later. The servers become available as they finish their jobs. The researchers continually add jobs to the queue, and the agent accepts or rejects them; the process never stops!  It's well-described as a continuing task.
 
 \subsection{Examples of MDPs}
 The MDP framework can be used to formalize a wide variety of sequential decision-making problems.
@@ -293,12 +324,14 @@ The MDP framework is highly extensible, and can be used in many applications. St
 
 \paragraph{Reward functions} Consider a robot learning to walk. The reward could be proportional to the forward motion. Lurching forward clearly maximizes immediate reward, however this action causes the robot to fall over. If the robot instead maximizes total forward motion instead, it would walk quickly but carefully. To teach an agent how to escape from a maze, the reward might be $-1$ for each time step that passes prior to escape, encouraging the agent to escape as quickly as possible. For an agent learning to play checkers or chess, the natural rewards might be $+1$ for winning, $-1$ for losing, and $0$ for drawing and for all non-terminal positions. In a stock market, we can use monetary rewards to optimize: since buying actions cost dollars, selling actions generate dollars, and the trade-offs are quite simple.
 \begin{itemize}
-\item Goal rewarding encoding: define a state where the goal is achieved as   having $+1$ reward and all other states yield zero reward.
-\item Action penalty representation: penalize the agent with a $-1$ each step in which the goal has not been achieved.
+\item \textbf{Goal rewarding encoding:} define a state where the goal is achieved as   having $+1$ reward and all other states yield zero reward.
+\item \textbf{Action penalty representation:} penalize the agent with a $-1$ each step in which the goal has not been achieved.
 \end{itemize}
 Both these formulations achieve optimal behavior by reaching the goal, eventually. But, what the agent does along the way is subtly different. Goal rewarding encoding doesn't really encourage the agent to get to the goal with any sense of urgency, and action penalty representation runs into serious problems if there is some small probability of getting stuck and never reaching the goal. Both schemes can lead to big problems for goals with \emph{really} long horizons, e.g. consider encouraging an agent to win a Nobel Prize. Just giving an agent a reward for attaining the ultimate goal is quite a tough sell. Some intermediate rewards like doing well on a science test or earning tenure could make a difference in orienting the agent in the right direction.
 
-\subsection{The reward hypothesis} There are three ways to think about creating intelligent behavior.
+\subsection{The reward hypothesis}
+The hypothesis states ``that all of what we mean by goals and purposes can be well thought of as the maximization of the expected value of the cumulative sum of a received scalar signal (called reward)''.
+There are three ways to think about creating intelligent behavior.
 \begin{itemize}
 \item Give a man a fish. If we want a machine to be smart, we program it with the behavior we want it to have. But, as new problems arise, the machine won't be able to adapt to new circumstances. It requires us to always be there providing new programs.
 \item Teach a man to fish. This is supervised learning: provide training examples and the machine writes its own program to match those examples. It learns, so long as we have a way to provide training examples, our machine will be able to write its own programs, and that's progress. But situations change.
@@ -312,5 +345,67 @@ Programming is one common way of defining rewards for a learning agent: a person
 
 \paragraph{What if we want a balance of actions?}
 What about when the desired behavior isn't to do the best thing all the time but instead to do a bunch of things in some balance? Imagine a pure reward maximizing music recommendation system: it would figure out your favorite song and then play it for you all the time, and that's not what we want. Perhaps there are ways to expand the state space so that the reward for playing a song is scaled back if that song has been played recently. ``An animal gets a lot of value from drinking, but only if it's thirsty''.
+
+\subsection{Policies and Value Functions} Almost all RL algorithms involve estimating \emph{value functions} - functions of states (or state-action pairs) that estimate \emph{how good} it is for the agent to be in a given state (or how good it is to perform a given action in a given state). Here, ``how good'' means expected cumulative future rewards. Because the rewards that the agent can expect to receive in the future depend on what actions it will take, value functions are defined with respect to particular ways of acting called policies.
+
+\paragraph{Policies} A \emph{policy} is a mapping from states to probabilities of selecting each possible action. If the agent is following policy $\pi$ at time $t$, then $\pi(a|s)$ is the probability that $A_t = a$ if $S_t = s$. Like $p$, $\pi$ is an ordinary function; the $|$ reminds us that it defines a conditional probability distribution over $a \in \mathcal A(s)$ for each $s \in \mathcal S$. The \emph{value function} of a state $s$ under a policy $\pi$, denoted by $v_\pi(s)$, is the expected return when starting in $s$ and following $\pi$ thereafter. For MDPs, we can define this formally by
+\begin{equation}
+  \label{eq: statevalueforpolicypi}
+  v_\pi(s) \coloneqq \mathbb E_{\pi} \left[ G_t | S_t = s \right] = \mathbb E_\pi \left[ \sum_{k=0}^{\infty} \gamma^k R_{t+k+1} | S_t = s \right], \hspace{24pt} \textrm{for all } s \in \mathcal S.
+\end{equation}
+We define the value of a terminal state (if there are any) to be zero. $v_\pi$ is the \emph{state-value function for policy $\pi$}. We can also define the value of taking action $a$ in state $s$ under a policy $\pi$, denoted by $q_\pi(s,a)$, as the expected return starting from $s$, taking the action $a$, and thereafter following policy $\pi$:
+\begin{equation}
+  \label{eq: actionvaluepolicyforpi}
+  q_\pi(s,a) \coloneqq \mathbb E_\pi \left[G_t | S_t = s, A_t = a \right] = \mathbb E_\pi \left[ \sum_{k=0}^\infty \gamma^k R_{t+k+1} | S_t = s , A_t = a \right].
+\end{equation}
+We refer to this as the \emph{action-value function for policy $\pi$}. Note that by the law of total probability, $v_\pi(s) = \mathbb E_\pi \left[G_t | S_t =   s\right] = \sum_{\pi} \Pr(A_t = a | \pi) q_\pi(s,a)$.
+\paragraph{Monte Carlo methods} We can estimate $v_\pi$ and $q_\pi$ from experience. If an agent follows policy $\pi$ and maintains an average, for each state encountered, of the actual returns that have followed that state, then the average will converge to the state's value $v_\pi(s)$ as the number of times that state is encountered approaches infinity. If separate averages are kept for each action taken at each state, then these averages will similarly converge to the action values $q_\pi(s,a)$. Methods of estimating in this way are known as Monte Carlo methods because they involve averaging over many random samples of actual returns. If there are very many states, it many not be practical to keep separate averages for each state individually. Instead, we could have our agent maintain $v_\pi$ and $q_\pi$ as parameterized functions (with fewer parameters than states), and adjust the parameters to match the observed returns; these are known as approximate solution methods.
+
+\paragraph{Value functions satisfy recursive relationships} For any policy $\pi$ and any state $s$, the following consistency condition holds between the value of $s$ and hte value of its possible successor states:
+\begin{align}
+  v_\pi(s) &\coloneqq \mathbb E_\pi \left[ G_t | S_t = s \right] \nonumber \\
+           &= \mathbb E_\pi \left[ R_{t+1} + \gamma G_{t+1} | S_t = s \right] \nonumber  \\
+           &= \sum_a \pi(a|s) \sum_{s'} \sum_{r} \Pr(s',r|s,a) \left[ r + \gamma                           \mathbb E_\pi \left[G_{t+1} | S_{t+1} = s' \right] \right] \nonumber  \\
+  \label{eq: bellmaneqforstatevaluepolicy}
+           &= \sum_a \pi(a|s) \sum_{s',r} \Pr(s',r|s,a) \left[r + \gamma v_\pi(s')\right], \hspace{25pt} \textrm{for all } s \in \mathcal S.
+\end{align}
+Equation \ref{eq: bellmaneqforstatevaluepolicy} is known as the Bellman equation for $v_\pi$: it expresses a relationship between the value of a state and the values of its successor states.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle,scale=1/2] (s) at (0,0) {};
+    \node[above=1mm of s] {$s$};
+    \foreach \x in {-1, 0, 1} {
+      \node[draw,circle,fill,scale=1/4] (b\x) at (\x, -1) {};
+      \node[draw,circle,scale=1/2] (l\x) at (\x-.25,-2) {};
+      \node[draw,circle,scale=1/2] (r\x) at (\x+.25,-2) {};
+      \draw[->] (s) -- (b\x);
+      \draw[->] (b\x) -- (l\x);
+      \draw[->] (b\x) -- (r\x);
+    }
+    \node at (0.2, -0.5) {$\pi$};
+    \node at (1.2, -0.75) {$a$};
+    \node[below = 2mm of b1] {$p$};
+    \node[below right = 1mm of b1] {$r$};
+    \node at (1.6, -1.9) {$s'$};
+  \end{tikzpicture}
+\caption{\footnotesize Think of looking ahead from a state to its possible successor states. Each open circle represents a state, and each solid circle represents a state-action pair. Starting from state $s$, the root node, the agent can take ay of some set of actions (three of which are shown in the diagram) based on its policy $\pi$. From each of these, the environment could respond with one of several next states, $s'$ (two are shown in the figure), along with a reward $r$, depending on the dynamics given by the function $p$. The Bellman equation \ref{eq: bellmaneqforstatevaluepolicy} averages over all possibilities, weighting each by its probability of occurring. It states that the value of the start state must equal the discounted value of the expected next state, plus the reward expected along the way.}
+\caption{fig: bellmanlookahead}
+\end{figure}
+The value function $v_\pi$ is the unique solution to its Bellman equation. Diagrams like \ref{fig: bellmanlookahead} are called \emph{backup diagrams} because they diagram relationships that form the basis of the update or \emph{backup} operations; these operations transfer value information \emph{back} to a state (or state-action pair) from its successor states (or state-action pairs). Unlike transition graphs, the state nodes of backup diagrams do not necessarily represent distinct states, e.g. a state might be its own successor.
+\subsection{Optimal Policies and Optimal Value Functions} Solving an RL task means finding a polic that achieves a lot of reward over the long run. For finite MDPs, we can precisely find an optimal policy as follows. Value functions define a partial ordering over policies: a policy $\pi$ is defined to be better than or equal to another policy $\pi'$ if its expected return is greater than or equal to that of $\pi'$ for all states. I.e. $\pi \geq \pi' \iff v_\pi(s) \geq v_{\pi'}(s)$ for all $s \in \mathcal S$. Clearly, there is always at least one policy that is better than or equal to all other policies; this is an \emph{optimal policy}. Although there may be more than one, we denote all optimal policies by $\pi_*$. They share the same state-value function, called the \emph{optimal state-value function}, denoted $v_*$, and defined as
+\[
+  v_*(s) = \max_\pi v_\pi(s)
+\]
+for all $s \in \mathcal S$. Note that optimal policies also share the same \emph{optimal action-value function}, denoted $q_*$, and defined as
+\[
+  q_*(s,a) = \max_\pi q_\pi(s,a),
+\]
+for all $s \in \mathcal S$ and $a \in \mathcal A(s)$. For the state-action pair $(s,a)$, this function gives the expected return for taking action $a$ in state $s$ and thereafter following an optimal policy. Thus, we may write $q_*$ in terms of $v_*$ as follows:
+\[
+  q_*(s,a) = \mathbb E \left[ R_{t+1} + \gamma v_*(S_{t+1}) | S_t = s, A_t = a \right].
+\]
+\subsection{Optimality and Approximation}
 
 \end{document}
