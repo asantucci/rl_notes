@@ -268,7 +268,8 @@ One example of an episodic task is a game of chess; it always ends in either a c
 where $\gamma \in [0,1]$ is called the \emph{discount rate}. This rate determines the present value of future rewards: a reward received $k$ time steps in the future is worth only $\gamma^{k-1}$ times what it would be worth if it were received immediately.\footnote{Intuitively, this makes sense: a dollar today is worth more to you than a dollar in a year.} Note that if $\gamma < 1$, then our discounted reward in equation \ref{eq: discounted return} is convergent so long as the reward sequence $\{R_k\}$ is bounded. If $\gamma = 0$, the agent is myopic and only focuses on maximizing immediate reward: its objective becomes choose $A_t$ so as to maximize only $R_{t+1}$. If it happened to be the case that the agent's actions influenced \emph{only} the immediate reward, not future rewards as well, then a myopic agent could maximize \ref{eq: discounted return} by separately maximizing each immediate reward.  But, in general acting to maximize the immediate reward can reduce access to future rewards so that the return is reduced. On the other hand, as $\gamma \leadsto 1$, the return objective takes future rewards into account more strongly and the agent becomes farsighted. Note that
 \begin{align}
   G_t &\coloneqq R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \gamma^3 R_{t+4}         + \ldots \nonumber \\
-      &= R_{t+1} + \gamma \left(R_{t+2} + \gamma R_{t+3} + \gamma^2 R_{t+4} +         \ldots \right) \nonumber \\
+      &= R_{t+1} + \gamma \left(R_{t+2} + \gamma R_{t+3} + \gamma^2 R_{t+4} +                 \ldots \right) \nonumber \\
+  \label{eq: recursivereturnformulation}
       &= R_{t+1} + \gamma G_{t+1}.
 \end{align}
 This works for all time steps $t<T$, even if termination occurs at $t+1$, so long as we define $G_T = 0$. Even though our return \ref{eq: discounted return}
@@ -358,17 +359,18 @@ We define the value of a terminal state (if there are any) to be zero. $v_\pi$ i
   \label{eq: actionvaluepolicyforpi}
   q_\pi(s,a) \coloneqq \mathbb E_\pi \left[G_t | S_t = s, A_t = a \right] = \mathbb E_\pi \left[ \sum_{k=0}^\infty \gamma^k R_{t+k+1} | S_t = s , A_t = a \right].
 \end{equation}
-We refer to this as the \emph{action-value function for policy $\pi$}. Note that by the law of total probability, $v_\pi(s) = \mathbb E_\pi \left[G_t | S_t =   s\right] = \sum_{\pi} \Pr(A_t = a | \pi) q_\pi(s,a)$.
+We refer to this as the \emph{action-value function for policy $\pi$}. Note that by the law of total probability, $v_\pi(s) = \mathbb E_\pi \left[G_t | S_t =   s\right] = \sum_{a} \pi(a|s) q_\pi(s,a)$.
 \paragraph{Monte Carlo methods} We can estimate $v_\pi$ and $q_\pi$ from experience. If an agent follows policy $\pi$ and maintains an average, for each state encountered, of the actual returns that have followed that state, then the average will converge to the state's value $v_\pi(s)$ as the number of times that state is encountered approaches infinity. If separate averages are kept for each action taken at each state, then these averages will similarly converge to the action values $q_\pi(s,a)$. Methods of estimating in this way are known as Monte Carlo methods because they involve averaging over many random samples of actual returns. If there are very many states, it many not be practical to keep separate averages for each state individually. Instead, we could have our agent maintain $v_\pi$ and $q_\pi$ as parameterized functions (with fewer parameters than states), and adjust the parameters to match the observed returns; these are known as approximate solution methods.
 
-\paragraph{Value functions satisfy recursive relationships} For any policy $\pi$ and any state $s$, the following consistency condition holds between the value of $s$ and hte value of its possible successor states:
+\paragraph{Value functions satisfy recursive relationships} For any policy $\pi$ and any state $s$, the following consistency condition holds between the value of $s$ and the value of its possible successor states:
 \begin{align}
   v_\pi(s) &\coloneqq \mathbb E_\pi \left[ G_t | S_t = s \right] \nonumber \\
-           &= \mathbb E_\pi \left[ R_{t+1} + \gamma G_{t+1} | S_t = s \right] \nonumber  \\
+           &= \mathbb E_\pi \left[ R_{t+1} + \gamma G_{t+1} | S_t = s \right] &\textrm{by equation } \ref{eq: recursivereturnformulation} \nonumber  \\
            &= \sum_a \pi(a|s) \sum_{s'} \sum_{r} \Pr(s',r|s,a) \left[ r + \gamma                           \mathbb E_\pi \left[G_{t+1} | S_{t+1} = s' \right] \right] \nonumber  \\
   \label{eq: bellmaneqforstatevaluepolicy}
            &= \sum_a \pi(a|s) \sum_{s',r} \Pr(s',r|s,a) \left[r + \gamma v_\pi(s')\right], \hspace{25pt} \textrm{for all } s \in \mathcal S.
 \end{align}
+The penultimate equality follows from the definition of expectation, and the final equality simply collapses the double-summation for syntactic sugar.
 Equation \ref{eq: bellmaneqforstatevaluepolicy} is known as the Bellman equation for $v_\pi$: it expresses a relationship between the value of a state and the values of its successor states.
 
 \begin{figure}[h]
@@ -391,7 +393,7 @@ Equation \ref{eq: bellmaneqforstatevaluepolicy} is known as the Bellman equation
     \node at (1.6, -1.9) {$s'$};
   \end{tikzpicture}
 \caption{\footnotesize Think of looking ahead from a state to its possible successor states. Each open circle represents a state, and each solid circle represents a state-action pair. Starting from state $s$, the root node, the agent can take ay of some set of actions (three of which are shown in the diagram) based on its policy $\pi$. From each of these, the environment could respond with one of several next states, $s'$ (two are shown in the figure), along with a reward $r$, depending on the dynamics given by the function $p$. The Bellman equation \ref{eq: bellmaneqforstatevaluepolicy} averages over all possibilities, weighting each by its probability of occurring. It states that the value of the start state must equal the discounted value of the expected next state, plus the reward expected along the way.}
-\caption{fig: bellmanlookahead}
+\label{fig: bellmanlookahead}
 \end{figure}
 The value function $v_\pi$ is the unique solution to its Bellman equation. Diagrams like \ref{fig: bellmanlookahead} are called \emph{backup diagrams} because they diagram relationships that form the basis of the update or \emph{backup} operations; these operations transfer value information \emph{back} to a state (or state-action pair) from its successor states (or state-action pairs). Unlike transition graphs, the state nodes of backup diagrams do not necessarily represent distinct states, e.g. a state might be its own successor.
 \subsection{Optimal Policies and Optimal Value Functions} Solving an RL task means finding a polic that achieves a lot of reward over the long run. For finite MDPs, we can precisely find an optimal policy as follows. Value functions define a partial ordering over policies: a policy $\pi$ is defined to be better than or equal to another policy $\pi'$ if its expected return is greater than or equal to that of $\pi'$ for all states. I.e. $\pi \geq \pi' \iff v_\pi(s) \geq v_{\pi'}(s)$ for all $s \in \mathcal S$. Clearly, there is always at least one policy that is better than or equal to all other policies; this is an \emph{optimal policy}. Although there may be more than one, we denote all optimal policies by $\pi_*$. They share the same state-value function, called the \emph{optimal state-value function}, denoted $v_*$, and defined as
@@ -406,6 +408,85 @@ for all $s \in \mathcal S$ and $a \in \mathcal A(s)$. For the state-action pair 
 \[
   q_*(s,a) = \mathbb E \left[ R_{t+1} + \gamma v_*(S_{t+1}) | S_t = s, A_t = a \right].
 \]
-\subsection{Optimality and Approximation}
+\paragraph{Bellman optimality equation}
+Because $v_*$ is the value function for a policy, it must satisfy the self-consistency condition given by the Bellman equation \ref{eq: bellmaneqforstatevaluepolicy} for state values. Because it is the optimal value function, however, $v_*$'s consistency condition can be written in a special form without reference to any specific policy. This is the Bellman equation for $v_*$, or the \emph{Bellman optimality equation}. Intuitively, this equation expresses the fact that the value of a state under an optimal policy \emph{must   equal} the expected return for the best action from that state.
+\begin{align}
+  v_*(s) &= \max_{a \in \mathcal A(s)} q_{pi_*} (s,a) = \max_a \mathbb E_{\pi_*} \left[G_t | S_t = s, A_t = a \right] = \max_a \mathbb E_{\pi_*} \left[R_{t+1} +            \gamma G_{t+1} | S_t = s, A_t = a \right] \nonumber \\
+         &= \max_a \mathbb E \left[R_{t+1} + \gamma v_*(S_{t+1}) | S_t = s, A_t                       = a \right] \\
+  \label{eq: bellmanoptimalityequationforpi}
+         &= \max_a \sum_{s',r} \Pr(s', r|s,a) \left[r + \gamma v_*(s')\right].
+\end{align}
+The last two equations are just two different forms of the Bellman optimality equation for $v_*$.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle,scale=1/2] (s) at (0,0) {};
+    \node[above=1mm of s] {$s$};
+    \foreach \x in {-1, 0, 1} {
+      \node[draw,circle,fill,scale=1/4] (b\x) at (\x, -1) {};
+      \node[draw,circle,scale=1/2] (l\x) at (\x-.25,-2) {};
+      \node[draw,circle,scale=1/2] (r\x) at (\x+.25,-2) {};
+      \draw[->] (s) -- (b\x);
+      \draw[->] (b\x) -- (l\x);
+      \draw[->] (b\x) -- (r\x);
+    }
+    % \node at (0.2, -0.5) {$\pi$};
+    \node at (1.2, -0.75) {$a$};
+    % \node[below = 2mm of b1] {$p$};
+    \node[below right = 1mm of b1] {$r$};
+    \node at (1.6, -1.9) {$s'$};
+    \node at (-1.2, -0.5) {max};
+    \path[-] (-.5,-.5) edge[bend right=30] (.5, -.5);
+  \end{tikzpicture}
+  \caption{\footnotesize We draw a backup diagram for the Bellman optimality equation \ref{eq: bellmanoptimalityequationforpi} for $v_*$. Notice that we've added an arc to indicate that the agent's choice points to represent that the maximum over that choice is taken rather than the expected value given some policy.}
+\end{figure}
+The Bellman optimality equation for $q_*$ is
+\[
+  q_*(s,a) = \mathbb E \left[R_{t+1} + \gamma \max_{a'} q_*(S_{t+1}, a') | S_t = s, A_t = a \right] = \sum_{s',r} \Pr(s', r|s,a) \left[r + \gamma \max_{a'} q_*(s', a') \right].
+\]
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle,scale=1/2] (s) at (0,0) {};
+    \node[above=1mm of s] {$s,a$};
+    \node at (0.5, -0.2) {$r$};
+    \foreach \x in {-1, 1} {
+      \node[draw,circle,scale=1/2] (b\x) at (\x, -1) {};
+      \node[draw,circle,fill,scale=1/4] (l\x) at (\x-.25,-2) {};
+      \node[draw,circle,fill,scale=1/4] (r\x) at (\x+.25,-2) {};
+      \draw[->] (s) -- (b\x);
+      \draw[->] (b\x) -- (l\x);
+      \draw[->] (b\x) -- (r\x);
+      \path[-] (\x+.125,-1.5) edge[bend left=30] (\x-.125,-1.5);
+    }
+    \node at (-1.5, -1.5) {\scriptsize max};
+    \node at (1.2, -0.75) {$s'$};
+    % \node[below = 2mm of b1] {$p$};
+    \node at (1.6, -1.9) {$a'$};
+    % \node at (-1.2, -0.5) {max};
+    % \path[-] (-.5,-.5) edge[bend right=30] (.5, -.5);
+  \end{tikzpicture}
+  \caption{\footnotesize We draw a backup diagram for the Bellman optimality equation for $q_*$.}
+\end{figure}
+For finite MDPs, the Bellman optimality equation for $v_*$ has a unique solution: it's actually a system of equations (one for each state), so if there are $n$ states or equations then there are also $n$ unknowns. If the dynamics $p$ of the environment are known, then in principle one can solve this system of equations for $v_*$ using any one of a variety of methods for solving systems of nonlinear equations. We can also solve a related set of equations for $q_*$.
 
+\paragraph{Using $v_*$ to determine an optimal policy} For each state $s$, there will be one or more actions at which the maximum is obtained in the Bellman optimality equation. Any policy that assigns nonzero probability \emph{only} to these actions is an optimal policy. This is akin to a one-step search: if you have the optimal value function $v_*$, then the actions that appear best after a one-step search will be optimal actions. Put differently, any policy that is \emph{greedy} with respect to the optimal evaluation function $v_*$ is an optimal policy. The beauty of $v_*$ is that if one uses it to evaluate teh short-term consequences of actions, specifically the one-step consequences, then a greedy policy is actually optimal in the long-term sense in which we are interested because $v_*$ already takes into account the reward consequences of all possible future behavior. I.e. $v_*$, the expected long run return, is turned into a quantity that is available locally and immediately available for each state. Whence, a one-step-ahead search yields the long-term optimal actions.
+\paragraph{Using $q_*$ to determine optimal actions} With $q_*$, the agent does not even have to do a one-step-ahead search: for any state $s$ it can simply find any action that maximizes $q_*(s,a)$. The action-value function effectively caches the results of all one-step-ahead searches. Hence, at the cost of representing a function of state-action pairs instead of just states, the optimal action value function allows optimal actions to be selected without having to know anything about possible successor states and their values, i.e. without having to know anything about the environment's dynamics.
+
+\paragraph{Downsides of explicitly solving Bellman optimality equation} The approach is rarely directly useful, since it's akin to an exhaustive search which looks ahead at all possibilities, computes their probabilities of occurrence and their desireabilities in terms of expected rewards. This solution relies on three assumptions that are rarely true in practice:
+\begin{enumerate}
+\item We accurately know the dynamics of the environment,
+\item We have enough computational resources to complete the computation of the   solution, and
+\item The Markov property.
+\end{enumerate}
+The second limitation often means that we typically have to settle for approximate solutions.
+\subsection{Optimality and Approximation}
+We've defined optimal value functions and optimal policies. Although in theory an agent that learns an optimal policy has succeeded, in practice this rarely happens. Optimal policies can only be generated with extreme computational cost. A critical aspect of the problem facing the agent is always the computational power available to it, in particular, the amount of computation it can perform in a single time step. Memory is also an important constraint, since a large amount of it is often required to built approximations of value functions, policies, and models. For tasks with small, finite state sets, we can use arrays or tables with a single entry per state (or state-action pair); this is what we call the \emph{tabular} case. Unfortunately, in many cases there are far too many states than we can store in memory. In these cases we must approximate the functions, using some sort of more compact parameterized function representation. Note that in approximating optimal behavior, there may be some states that the agent faces with such a low probability that selecting suboptimal actions has little impact on the reward the agent receives. The online nature of RL makes it possible to approximate optimal policies in ways that put more effort into learning to make good decisions for frequently encountered states, at the expense of less effort for infrequently encountered states.
+
+\subsection{Summary of Finite MDPs}
+ RL is about learning from interaction how to behave well in order to achieve a goal. The RL \emph{agent} and its \emph{environment} interact over a sequence of discrete time steps. The specification of their interface defines a particular task: the \emph{actions} are the choices made by the agent; the \emph{states} are the basis for making the choices; and the \emph{rewards} ar ethe basis for evaluating the choices. A \emph{policy} is a stochastic rule by which the agent selects actions as a function of states. The agent's objective is to maximize the amount of reward it receives over time. When RL is formulated with well-defined transition probabilities, we realize an MDP. A finite MDP has finite state, action, and reward sets. The \emph{return} is the function of future rewards that the agent seeks to maximize in expected value. There are different definitions depending on the nature of the task, i.e. for \emph{continuing} tasks we use a \emph{discounted} delayed reward whereas in \emph{episodic} tasks we use the undiscounted formulation.
+
+A policy's \emph{value functions} assign to each state (or state-action pair) the expected return from that state (or state-action pair), given that the agent uses the policy. The \emph{optimal value functions} assign to each state (or state-action pair) the largest expected return achievable by any policy. A policy whose value functions are optimal is an \emph{optimal policy}. Any policy that is \emph{greedy} with respect to the optimal value functions must be an optimal policy. The \emph{Bellman optimality equations} are special consistency conditions that the optimal value functions must satisfy and that can, in principle, be solved for the optimal value functions, from which an optimal policy can be determined.
+
+Even if the agent has a complete and accurate environment model, the agent is typically unable to perform enough computation per time step to fully use it. The memory available is also an important constraint, since memory may be required to build up accurate approximations of value functions, policies, and models. In most cases of interest, there are far more states than could possibly be entries in a table, and approximations must be made. 
 \end{document}
