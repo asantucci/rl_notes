@@ -256,7 +256,7 @@ is some specific function of the reward sequence. In the simplest case the retur
 where $T$ is a final time step. This approach really only makes sense in applications where there is a notion of a final time step, i.e. when the agent-environment interaction naturally breaks into subsequences, which we call \emph{episodes}. Example episodes are plays of a game, trips through a maze, or any sort of repeated interaction; episodes end in a special \emph{terminal state}, followed by a reset to a standart starting state or to a sample from a standard distribution of starting states. No matter how the last episode finished, e.g. win or lose, the next episode begins independently of how the previous one ended.  Tasks with episodes of this kind are called \emph{episodic} tasks; in such tasks we sometimes distinguish the set of all non-terminal states $\mathcal S$ from the set of all states plus the terminal state, denoted by $\mathcal S^+$. Note that the time of termination $T$ is a random variable that varies from episode to episode.
 
 \paragraph{Examples of episodic tasks}
-One example of an episodic task is a game of chess; it always ends in either a checkmate, draw, or resignation, and a single game constitutes an episode. Each game starts from the same start state with all pieces reset. Another example is the case of an agent learning to play a video game, in which the player gets a point for collecting treasure blocks and dies when they touch an enemy. This game is clearly an episodic MDP: the agent tries to get a high score, collecting as many points as possible before the game ends. The state is an array of pixel values corresponding to the current screen. There are four actions: up, left, down, right. The agent gets a reward of $+1$ every time they collect a treasure block. An episode ends when the agent touches one of the enemies. Regardless of how the episode ends, the next episode begins in the same way, with the agent at the center of the screen with no enemies present.
+One example of an episodic task is a game of chess; it always ends in either a checkmate, draw, or resignation, and a single game constitutes an episode. Each game starts from the same start state with all pieces reset. The state is given by the position of all the pieces on the board, and the actions are all the legal moves. We could define the reward as $+1$ for winning and zero for all other moves. Another example is the case of an agent learning to play a video game, in which the player gets a point for collecting treasure blocks and dies when they touch an enemy. This game is clearly an episodic MDP: the agent tries to get a high score, collecting as many points as possible before the game ends. The state is an array of pixel values corresponding to the current screen. There are four actions: up, left, down, right. The agent gets a reward of $+1$ every time they collect a treasure block. An episode ends when the agent touches one of the enemies. Regardless of how the episode ends, the next episode begins in the same way, with the agent at the center of the screen with no enemies present.
 
 \subsection{Continuing Tasks} In many cases, the agent-environment interaction doesn't break naturally into identifiable episodes, but instead goes on continually without limit; e.g. a process-control task, or an application to a robot with a long life span. We call these \emph{continuing tasks}. The definition of return as in equation \ref{eq: sumofrewards} is problematic because the final time step would be $T =\infty$, and the return (which we are trying to maximize) could itself be divergent. For example, suppose an agent receives a reward of $+1$ at each time step. To address this issue, we use discounting.
 
@@ -425,18 +425,98 @@ In general, a policy assigns probabilities to each action in each state; i.e. mu
   \caption{\footnotesize Here, we have a stochastic policy. We've indicated the randomness by drawing two possible actions with dashed lines for some of our states. To be concrete, the lower-left states each select an action of ``up'' or ``right'' each with probability $1/2$. Notice that the stochastic policy will require the \emph{same} number of steps to reach the house as the deterministic policy previously shown.}
 \end{figure}
 
+\subsubsection{(Action/State) Value Functions}
+Many problems involve some sort of delayed reward; e.g. a store manager could lower their prices and sell off their entire inventory to maximize short-term gain. But, they might do better in the long-run by maintaining inventory to sell when demand is high. In RL, rewards capture the notion of short-term gains, but our objective is to learn a policy that achieves the most rewards in the long run; a value function formalizes what this means.
 
-The \emph{value function} of a state $s$ under a policy $\pi$, denoted by $v_\pi(s)$, is the expected return when starting in $s$ and following $\pi$ thereafter. For MDPs, we can define this formally by
+\paragraph{State value function}
+The \emph{state-value function} of a state $s$ under a policy $\pi$, denoted by $v_\pi(s)$, is the expected return when starting in $s$ and following $\pi$ thereafter.\footnote{Note that because long-run outcomes depend on repeated actions and outcomes, value functions only make sense in the context of policies.} For MDPs, we can define this formally by
 \begin{equation}
   \label{eq: statevalueforpolicypi}
   v_\pi(s) \coloneqq \mathbb E_{\pi} \left[ G_t | S_t = s \right] = \mathbb E_\pi \left[ \sum_{k=0}^{\infty} \gamma^k R_{t+k+1} | S_t = s \right], \hspace{24pt} \textrm{for all } s \in \mathcal S.
 \end{equation}
-We define the value of a terminal state (if there are any) to be zero. $v_\pi$ is the \emph{state-value function for policy $\pi$}. We can also define the value of taking action $a$ in state $s$ under a policy $\pi$, denoted by $q_\pi(s,a)$, as the expected return starting from $s$, taking the action $a$, and thereafter following policy $\pi$:
+We define the value of a terminal state (if there are any) to be zero. $v_\pi$ is the \emph{state-value function for policy $\pi$}. Crucially, value functions allow an agent to query the quality of its current situation as opposed to waiting to observe the long-term outcome; they summarize all possible futures by averaging over returns. Since ultimately we care about learning a good policy, the value function enables us to compare the quality of different policies!
+
+\paragraph{Intuition on state-value functions} Suppose there is an agent playing a game of chess, which is clearly an episodic MDP. The state is given by the positions of all the pieces on the board, the actions are the set of legal moves, and termination occurs when the game ends in either a win, loss, or draw. We could define a reward as $+1$ when our agent wins and zero for all other moves. Realize that the reward doesn't tell us much about how well the agent is playing during the match: we have to wait till the end of the episode/game to realize the non-zero reward. However, the \emph{value function} lets us see much more; since the state value is equal to the expected sum of future rewards. In this case, we effectively defined reward as an indicator for winning, whence taking an expectation over an indicator variable we realize a probability, i.e. the value function in this instance encodes the probability of winning the game if we follow the policy $\pi$. Note that in this game, the opponent's move is part of the state transition. E.g. the environment moves both the agent's piece, and the opponent's piece, and this puts the board into a new state $s'$. An \emph{action-value function} would allow us to assess the probability of winning for each possible move given we follow the policy $\pi$ for the rest of the game.
+
+\paragraph{Action value function}
+We can also define the value of taking action $a$ in state $s$ under a policy $\pi$, denoted by $q_\pi(s,a)$, as the expected return starting from $s$, taking the action $a$, and thereafter following policy $\pi$:
 \begin{equation}
   \label{eq: actionvaluepolicyforpi}
   q_\pi(s,a) \coloneqq \mathbb E_\pi \left[G_t | S_t = s, A_t = a \right] = \mathbb E_\pi \left[ \sum_{k=0}^\infty \gamma^k R_{t+k+1} | S_t = s , A_t = a \right].
 \end{equation}
-We refer to this as the \emph{action-value function for policy $\pi$}. Note that by the law of total probability, $v_\pi(s) = \mathbb E_\pi \left[G_t | S_t =   s\right] = \sum_{a} \pi(a|s) q_\pi(s,a)$.
+We refer to this as the \emph{action-value function for policy $\pi$}. Note that by the law of total probability, $v_\pi(s) = \mathbb E_\pi \left[G_t | S_t =       s\right] = \sum_{a} \pi(a|s) q_\pi(s,a)$.
+
+\paragraph{Intuition for action value functions} Let's consider a continuing MDP.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \draw[step=1.0,black,thin] (0,0) grid (5, 5);
+    \node (a) at (1.5, 4.5) {$A$};
+    \node (ap) at (1.5, 0.5) {$A'$};
+    \path[->,purple] (a) edge[bend left = 20] (ap);
+    \node (b) at (3.5,4.5) {$B$};
+    \node (bp) at (3.5, 2.5) {$B'$};
+    \path[->,purple] (b) edge[bend left = 20] (bp);
+    \node[below = 1mm of b] {$\scriptstyle +5$};
+    \node[below = 2mm of a] {$\scriptstyle +10$};
+    \foreach \x in {1.5, 2.5, 3.5} {
+      \path[->] (\x-0.1, 0) edge[loop below,gray,distance=4mm] (\x+0.1, 0);
+    }
+    \path[->] (5, 4.6) edge[loop right,gray,distance=4mm] node[right] {$-1$}       (5, 4.4);
+    \foreach \y in {3.5, 2.5, 1.5, 0.5} {
+      \path[->] (5, \y+.1) edge[loop right,gray,distance=4mm] (5, \y-.1);
+      \path[->] (0, \y+.1) edge[loop left ,gray,distance=4mm] (0, \y-.1);
+    }
+    \path[->] (2.4, 5) edge[loop above,gray,distance=4mm] (2.6, 5);
+    \node[gray] at (-0.3, 2.8) {$-1$};
+  \end{tikzpicture}
+  \caption{\footnotesize The states are defined by the locations on the grid. The actions move the agent up, down, left, or right. The agent cannot move off the grid and bumping generates a reward of minus one. Most other actions yield no reward, but there are two special states labeled $A$ and $B$. Every action in state $A$ yields $+10$ reward and $+5$ in state $B$. Correspondingly, every action in $A$ and $B$ transition the agent with probability one to $A'$ and $B'$ respectively.}
+\end{figure}
+
+We must first specify the policy before we can figure out what the value function is. Suppose we start with a uniform random policy. Since this is a continuing task, we need to choose $\gamma < 1$. Let's try $\gamma = 0.9$.
+We will later learn how to estimate the value function but for now let's take it as given below.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \draw[step=1.0,black,thin] (0,0) grid (5, 5);
+    % Bottom row
+    \node at (0.5, 0.5) {$-1.9$};
+    \node at (1.5, 0.5) {$-1.3$};
+    \node at (2.5, 0.5) {$-1.2$};
+    \node at (3.5, 0.5) {$-1.4$};
+    \node at (4.5, 0.5) {$-2.0$};
+    % Second to last row from bottom
+    \node at (0.5, 1.5) {$-1.0$};
+    \node at (1.5, 1.5) {$-0.4$};
+    \node at (2.5, 1.5) {$-0.4$};
+    \node at (3.5, 1.5) {$-0.6$};
+    \node at (4.5, 1.5) {$-1.2$};
+    % Middle row
+    \node at (0.5, 2.5) {$0.1$};
+    \node at (1.5, 2.5) {$0.7$};
+    \node at (2.5, 2.5) {$0.7$};
+    \node at (3.5, 2.5) {$0.4$};
+    \node at (4.5, 2.5) {$-0.4$};
+    % Second row from top
+    \node at (0.5, 3.5) {$1.5$};
+    \node at (1.5, 3.5) {$3.0$};
+    \node at (2.5, 3.5) {$2.3$};
+    \node at (3.5, 3.5) {$1.9$};
+    \node at (4.5, 3.5) {$0.5$};
+    % Top row
+    \node at (0.5, 4.5) {$3.3$};
+    \node at (1.5, 4.5) {$8.8$};
+    \node at (2.5, 4.5) {$4.4$};
+    \node at (3.5, 4.5) {$5.3$};
+    \node at (4.5, 4.5) {$1.5$};
+    % Gamma factor for clarity.
+    \node at (4, 5.5) {$\gamma = 0.9$};
+  \end{tikzpicture}
+\end{figure}
+
+
 \paragraph{Monte Carlo methods} We can estimate $v_\pi$ and $q_\pi$ from experience. If an agent follows policy $\pi$ and maintains an average, for each state encountered, of the actual returns that have followed that state, then the average will converge to the state's value $v_\pi(s)$ as the number of times that state is encountered approaches infinity. If separate averages are kept for each action taken at each state, then these averages will similarly converge to the action values $q_\pi(s,a)$. Methods of estimating in this way are known as Monte Carlo methods because they involve averaging over many random samples of actual returns. If there are very many states, it many not be practical to keep separate averages for each state individually. Instead, we could have our agent maintain $v_\pi$ and $q_\pi$ as parameterized functions (with fewer parameters than states), and adjust the parameters to match the observed returns; these are known as approximate solution methods.
 
 \paragraph{Value functions satisfy recursive relationships} For any policy $\pi$ and any state $s$, the following consistency condition holds between the value of $s$ and the value of its possible successor states:
