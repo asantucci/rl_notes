@@ -576,6 +576,68 @@ Each term is weighted by the probability under our policy $\pi$ of selecting $a'
 \end{align*}
 
 Bellman equations for both state and action-value functions provide relationships between the values of a state or state-action pair and the possible next states or next state-action pairs. These equations capture an important structure of the RL problem, and we will discuss how we can use this to design algorithms which efficiently estimate value functions.
+
+\paragraph{Using Bellman equations to compute value-functions} Let's illustrate a simple example consisting of four states, labeled $A$, $B$, $C$, and $D$ on a grid. The action space consists of moving up, down, left, and right. Actions which would move off the grid, instead keep the agent in place. E.g. if we start in state $C$ and move ``up'' we end in state $A$. If we then try to move ``left'' we would hit a wall and stay in state $A$. MOve to the right next would take us to state $B$, etc. The reward is $0$ everywhere except for any time the agent lands in state $B$, in which case it gets a reward of $+5$; this includes starting in state $B$ and hitting a wall to remain there.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \draw[step=2.0,black,thin, dashed] (0,0) grid (4, 4);
+    \draw (0, 0) rectangle (4, 4);
+    \node (a) at (1, 3) {$A$};
+    \node (b) at (3, 3) {$B$};
+    \node (c) at (1, 1) {$C$};
+    \node (d) at (3, 1) {$D$};
+    % States A-B
+    \draw[->,gray] (1.5, 3.1) -- (2.5, 3.1) node[above, gray] {\tiny +5};
+    \draw[->,gray] (2.5, 2.9) -- (1.5, 2.9) node[below, gray] {\tiny 0};
+    % States B-D
+    \draw[->,gray] (2.9, 1.5) -- (2.9, 2.5) node[left, gray] {\tiny +5};
+    \draw[->,gray] (3.1, 2.5) -- (3.1, 1.5) node[right, gray] {\tiny 0};
+    % States C-D
+    \draw[<->,gray] (1.5, 1) -- (2.5, 1) node[below,gray] {\tiny 0};
+    % States A-C
+    \draw[<->,gray] (1, 1.5) -- (1, 2.5) node[left,gray] {\tiny 0};
+    % Self-loops.
+    \path[gray] (a) edge[loop above] node[above] {\tiny 0} (a);
+    \path[gray] (b) edge[loop above] node[above] {\tiny +5} (b);
+    \path[gray] (c) edge[loop below] node[below] {\tiny 0} (c);
+    \path[gray] (d) edge[loop below] node[below] {\tiny 0} (d);
+    % Policy
+    \node at (1,-1) {\resizebox{1.5cm}{!}{$\pi$}};
+    \draw[<->,dashed] (2.25, -1) -- (3.75, -1);
+    \draw[<->,dashed] (3, -1.75) -- (3, -0.25);
+    \node at (3.35, -0.65) {\scriptsize 25\%};
+    \node at (2.65, -0.65) {\scriptsize 25\%};
+    \node at (2.65, -1.35) {\scriptsize 25\%};
+    \node at (3.35, -1.35) {\scriptsize 25\%};
+  \end{tikzpicture}
+\end{figure}
+Suppose we consider a uniform random policy, which moves in each direction $1/4$ of the time. Since this is a continuing task, we choose a discount factor of $\gamma = 0.7$. How can we actually work out the value of each of these states under this policy?  Recall that the value function is the expected return under policy $\pi$, i.e. an average over the return obtained by each sequence of actions an agent could possibly choose (infinitely many possible futures). Fortunately, the Bellman equation for the state-value function provides an elegant solution: using the Bellman equation, we can write down an expression for the value of state $A$ in terms of the sum of the four possible actions the resulting possible successor states.
+
+\begin{equation*}
+  v_\pi(s) = \color{purple} \sum_a \pi(a|s) \color{orange} \sum_r \sum_{s'} \color{black} \Pr(\left(s', r|s,a\right) \left[ \color{orange} r + \gamma v_\pi(s') \color{black} \right]
+\end{equation*}
+We can simplify the expression further \emph{in this case}, because for each action there's only one possible associated next state and reward,
+i.e. the sum over $s'$ and $r$ reduces to a single value.
+\[
+v_\pi(A) = \color{purple} \sum_a \pi(a|A) \color{orange} \left(r + 0.7 v_\pi(s')\right)
+\]
+To go even further, if we go right from state $A$, we land in state $B$ and receive a reward of $+5$. This happens $1/4$ of the time under the random policy. If we go down, we land in state $C$, and receive no immediate reward, and this occurs $1/4$ of the time. If we go either up or left, we will land back in state $A$ again, since each of the actions occur with probability $1/4$, and since both actions land back in state $A$ and receive no reward, we can combine them into a single term with a coefficient of $1/2$.
+\[
+  v_\pi(A) = \color{purple} \frac{1}{4} \color{orange} \left(5 + 0.7 v_\pi(B)\right) \color{black} + \color{purple} \frac{1}{4} \color{orange} \left(0.7 v_\pi(C)\right) \color{black} + \color{purple} \frac{1}{2} \color{orange} 0.7 v_\pi(A).
+\]
+Using the same methodology, we can write down a similar equation for each of the other states.
+\begin{align*}
+  v_\pi(B) &= \frac{1}{2} \left(5 + 0.7 v_\pi(B)\right) + \frac{1}{4} 0.8              v_\pi(A) + \frac{1}{4} 0.7 v_\pi (D) \\
+  v_\pi(C) &= \frac{1}{4} 0.8 v_\pi(A) + \frac{1}{4} 0.8 v_\pi(D) + \frac{1}{2}              0.7 v_\pi(C) \\
+  v_\pi(D) &= \color{purple} \frac{1}{4} \color{orange} \left(5 + 0.7 V_\pi(B)\right) \color{black} + \color{purple} \frac{1}{4} \color{orange} 0.7 v_\pi(C) \color{black} + \color{purple} \frac{1}{2} \color{orange} 0.7 v_\pi(D).
+\end{align*}
+We now have a system of four equations in four unknowns, which can be solved for. The unique solution for this example happens to work out to
+\[
+  v_\pi(A) = 4.2, \hspace{15pt} v_\pi(B) = 6.1, \hspace{15pt} v_\pi(C) = 2.2, \hspace{15pt} v_\pi(D) = 4.2.
+\]
+What's important to note is that the Bellman equation reduced an unmanageable infinite sum over possible futures to a simple linear algebra problem. The Bellman equation provides a powerful general relationship for MDPs.
+Note that for more interesting problems like chess, we won't even be able to list all possible states, since there are around $10^{45}$ of them, let alone construct and solve the resulting system of Bellman equations.
 \subsection{Optimal Policies and Optimal Value Functions}
 
 Solving an RL task means finding a polic that achieves a lot of reward over the long run. For finite MDPs, we can precisely find an optimal policy as follows. Value functions define a partial ordering over policies: a policy $\pi$ is defined to be better than or equal to another policy $\pi'$ if its expected return is greater than or equal to that of $\pi'$ for all states. I.e. $\pi \geq \pi' \iff v_\pi(s) \geq v_{\pi'}(s)$ for all $s \in \mathcal S$. Clearly, there is always at least one policy that is better than or equal to all other policies; this is an \emph{optimal policy}. Although there may be more than one, we denote all optimal policies by $\pi_*$. They share the same state-value function, called the \emph{optimal state-value function}, denoted $v_*$, and defined as
