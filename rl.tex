@@ -638,9 +638,65 @@ We now have a system of four equations in four unknowns, which can be solved for
 \]
 What's important to note is that the Bellman equation reduced an unmanageable infinite sum over possible futures to a simple linear algebra problem. The Bellman equation provides a powerful general relationship for MDPs.
 Note that for more interesting problems like chess, we won't even be able to list all possible states, since there are around $10^{45}$ of them, let alone construct and solve the resulting system of Bellman equations.
-\subsection{Optimal Policies and Optimal Value Functions}
 
-Solving an RL task means finding a polic that achieves a lot of reward over the long run. For finite MDPs, we can precisely find an optimal policy as follows. Value functions define a partial ordering over policies: a policy $\pi$ is defined to be better than or equal to another policy $\pi'$ if its expected return is greater than or equal to that of $\pi'$ for all states. I.e. $\pi \geq \pi' \iff v_\pi(s) \geq v_{\pi'}(s)$ for all $s \in \mathcal S$. Clearly, there is always at least one policy that is better than or equal to all other policies; this is an \emph{optimal policy}. Although there may be more than one, we denote all optimal policies by $\pi_*$. They share the same state-value function, called the \emph{optimal state-value function}, denoted $v_*$, and defined as
+\subsection{Optimal Policies and Optimal Value Functions}
+Up to this point, we've generally talked about a policy as something that is given; it specifies how our agent behaves. Given such a way of behaving, we've discussed how to find the value function. 
+But, solving an RL task means \emph{finding} a policy that achieves a lot of reward over the long run. For finite MDPs, we can precisely find an optimal policy as follows. Value functions define a partial ordering over policies: a policy $\pi$ is defined to be better than or equal to another policy $\pi'$ if its expected return is greater than or equal to that of $\pi'$ for all states. I.e. $\pi \geq \pi' \iff v_\pi(s) \geq v_{\pi'}(s)$ for all $s \in \mathcal S$.
+If a policy is better than another in some states but not others, we cannot say that one policy is better than the other. Clearly, there is always at least one policy that is better than or equal to all other policies; this is an \emph{optimal policy}.\footnote{To see this, suppose that we have two policies $\pi_1$ and $\pi_2$, where $\pi_1$ sees some states with higher value relative to $\pi_2$, but not for all states. We can create a new policy $\pi_3$ which is defined by combining the two aforementioned policies such that for each state we select the policy that performs best. This new policy $\pi_3$ will have a value greater than or equal to both $\pi_1$ and $\pi_2$ in \emph{every} state. Therefore, we will never have a situation where doing well in one state requires a sacrifice at another. Due to this (informal) reasoning, there will always exist some policy which is best in every state. Note that it's possible that $\pi_3$ achieves values that strictly exceed both of $\pi_1$ and $\pi_2$, and this is due to the fact that by playing other states more optimally that are closeby, we could be setting ourselves up for a higher long-term reward.} Although there may be more than one, we denote all optimal policies by $\pi_*$.
+
+\paragraph{Example optimal policy}
+Let's consider a two-choice MDP, where the only decision to be made is in the top state labeled $X$.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle,scale=1/2] (x) at (0, 0) {$X$};
+    \node[draw,circle,fill,scale=1/2] (a1) at (-1, -1) {};
+    \node[draw,circle,fill,scale=1/2] (a2) at ( 1, -1) {};
+    \node[draw,circle,below=1cm of a1,scale=1/2] (y) {$Y$};
+    \node[draw,circle,below=1cm of a2,scale=1/2] (z) {$Z$};
+    \node[draw,circle,fill,scale=1/2,below=1cm of y] (l) {};
+    \node[draw,circle,fill,scale=1/2,below=1cm of z] (r) {};
+    \draw[->] (x) -- (a1);
+    \draw[->] (x) -- (a2);
+    \draw[->] (a1) -- (y);
+    \draw[->] (a2) -- (z);
+    \node[below right = 1mm of a1] {\scriptsize +1};
+    \node[below left  = 1mm of a2] {\scriptsize 0};
+    \draw[->] (y) -- (l);
+    \draw[->] (z) -- (r);
+    \path[->] (l) edge[bend left=60] node[left] {0} (x);
+    \path[->] (r) edge[bend right=60] node[right] {+2} (x);
+    \node[right = 1mm of a1] {$A_1$};
+    \node[left = 1mm of a2] {$A_2$};
+  \end{tikzpicture}
+  \caption{\footnotesize The agent can take either action $A_1$ or $A_2$. From state $X$, action $A_1$ takes the agent to state $Y$. In state $Y$, only action $A_1$ is available and it takes the agent back to $X$. On the other hand, action $A_2$ (from $X$) takes the agent to state $Z$. From state $Z$, action $A_1$ is again the only action available and it takes the agent back to state $X$. Realize that although action $A_1$ gives an immediate reward of $+1$, action $A_2$ offers a larger (albeit delayed) reward of $+2$ after a single step delay.}
+\end{figure}
+In the above MDP, there are only two deterministic policies which are completely defined by the agent's choice in state $X$: take action $A_1$ or action $A_2$. Let's call these $\pi_1$ and $\pi_2$ respectively.
+\[
+  \pi_1(X) = A_1, \hspace{25pt} \pi_2(X) = A_2.
+\]
+The optimal policy is the one for which the value of $X$ is highest, but the answer depends on the discount factor $\gamma$ (since this is a continuing task). If $\gamma = 0$, then the value function is defined using only the \emph{immediate} reward. In this case, the value of $X$ under $\pi_1$ is $+1$, while the value under $\pi_2$ is zero because the positive reward is only incurred after a delay, and this doesn't affect the return when $\gamma = 0$. In this case of $\gamma = 0$, then $\pi_1$ is the optimal policy. What if instead, $\gamma = 0.9$? In this case, the value of $X$ under each policy is an infinite sum. The state-value functions are
+\begin{align*}
+  v_{\pi_1}(X) &= 1 + 0.9 * 0 + (0.9)^2 * 1 + \ldots = \sum_{k=0}^{\infty} 0.9^{2k} = \frac{1}{1-0.9^2} \approx 5.3 \\
+  v_{\pi_2}(X) &= 0 + 0.9 * 2 + (0.9)^2 * 0 + \ldots = \sum_{k=0}^{\infty} (0.9)^{2k+1}*2 = \frac{0.9}{1-0.9^2} * 2 \approx 9.5
+\end{align*}
+We've used the fact that we can compactly represent each state-value function by a geometric series. Note that in the case of $\pi_1$, we are incurring a positive unit valued reward on each even time step, whereas for $\pi_2$ we are incurring a slightly higher reward on each odd time step. In this example, $\pi_2$ is the more optimal policy, and we could find it simply by computing the state-value function for each deterministic policy under consideration. In general, it won't be so easy. Even if we limited ourselves to deterministic policies, the number of possible policies is equal to the number of possible actions raised to the number of possible states, $|\mathcal A|^{|\mathcal S|}$. This means we cannot use a brute force search for even moderately sized problems. Fortunately, the \emph{Bellman optimality equations} can help us organize our search of the policy space.
+
+\paragraph{Optimal value functions}
+Optimal policies achieve the goal of RL by achieving as much reward as possible in the long run, but the exponential number of possible policies make searching for the optimal policy by brute-force intractable.
+Recall that
+\[
+  \pi_1 \geq \pi_2 \iff v_{\pi_1}(s) \geq v_{\pi_2}(s) \hspace{10pt} \forall \hspace{10pt} s \in \mathcal S.
+\]
+An optimal policy is one that is as good or better than every other policy. The value function for the optimal policy thus has the greatest value possible in every state.
+\begin{align*}
+  v_{\pi_*}(s) \coloneqq \mathbb E_{\pi_*} \left[ G_t | S_t = s \right] = \max_\pi v_\pi (s) \hspace{10pt} \forall \hspace{5pt} s \in \mathcal S.
+\end{align*}
+What does it mean to take a maximum over different policies? Imagine we were to consider every possible policy and compute each of their values for the state $s$: the value of an optimal policy is defined to be the largest of all the computed values. We could repeat this for every state and the value of an optimal policy would always be largest. 
+
+\paragraph{Optimal Policies}
+An optimal policy is defined as the policy with the highest possible value function in all states. At least one optimal policy always exists, but there may be more than one.
+They share the same state-value function, called the \emph{optimal state-value function}, denoted $v_*$, and defined as
 \[
   v_*(s) = \max_\pi v_\pi(s)
 \]
@@ -653,9 +709,23 @@ for all $s \in \mathcal S$ and $a \in \mathcal A(s)$. For the state-action pair 
   q_*(s,a) = \mathbb E \left[ R_{t+1} + \gamma v_*(S_{t+1}) | S_t = s, A_t = a \right].
 \]
 \paragraph{Bellman optimality equation}
-Because $v_*$ is the value function for a policy, it must satisfy the self-consistency condition given by the Bellman equation \ref{eq: bellmaneqforstatevaluepolicy} for state values. Because it is the optimal value function, however, $v_*$'s consistency condition can be written in a special form without reference to any specific policy. This is the Bellman equation for $v_*$, or the \emph{Bellman optimality equation}. Intuitively, this equation expresses the fact that the value of a state under an optimal policy \emph{must   equal} the expected return for the best action from that state.
+Because $v_*$ is the value function for \emph{a} policy, it must satisfy the self-consistency condition given by the Bellman equation \ref{eq:   bellmaneqforstatevaluepolicy} for state values. I.e. we have that
+\[
+  v_\pi(s) = \sum_a \pi(a|s) \sum_{s'} \sum_r \Pr(s', r | s, a) \left[ r + \gamma v_\pi(s')\right].
+\]
+If we simply substitute the optimal policy $\pi_*$ into this equation, we get the Bellman equation for $v_*$,
+\[
+  \color{purple} v_*(s) \color{black} = \sum_a \color{orange} \pi_* \color{black} (a|s) \sum_{s'} \sum_r \Pr(s', r | s, a) \left[ r + \gamma \color{purple} v_* \color{black} (s') \right].
+\]
+So far, nothing special, we've simply substituted an optimal policy into the Bellman equation. However, because this is an optimal policy, $v_*$ can be written in a special form without referencing the policy itself. Remember that there always exists an optimal deterministic policy, one that selects an optimal action in every state. Such a determinstic policy would assign probability 1 for an action that achieves the highest value and probability zero for all other actions. We can express this another way by replacing the sum over $\pi_*$ with a maximum over the action-space, i.e. using $\max_a$:
+\begin{equation}
+  \label{eq: bellmanoptimalityequationforvstar}
+\color{purple} v_* \color{black} (s) = \color{purple} \max_{\color{black} a} \color{black} \sum_{s'} \sum_r \Pr(s', r | s,a) \left[ r + \gamma \color{purple} v_* \color{black}(s')\right].
+\end{equation}
+Notice that $\pi_*$ no longer appears in the equation! We have derived a relationship that applies directly to $v_*$ itself. This 
+special form of the equation is known as the \emph{Bellman optimality equation} for $v_*$. Intuitively, this equation expresses the fact that the value of a state under an optimal policy \emph{must equal} the expected return for the best action from that state; re-writing it all together:
 \begin{align}
-  v_*(s) &= \max_{a \in \mathcal A(s)} q_{pi_*} (s,a) = \max_a \mathbb E_{\pi_*} \left[G_t | S_t = s, A_t = a \right] = \max_a \mathbb E_{\pi_*} \left[R_{t+1} +            \gamma G_{t+1} | S_t = s, A_t = a \right] \nonumber \\
+  v_*(s) &= \max_{a \in \mathcal A(s)} q_{\pi_*} (s,a) = \max_a \mathbb E_{\pi_*} \left[G_t | S_t = s, A_t = a \right] = \max_a \mathbb E_{\pi_*} \left[R_{t+1} +            \gamma G_{t+1} | S_t = s, A_t = a \right] \nonumber \\
          &= \max_a \mathbb E \left[R_{t+1} + \gamma v_*(S_{t+1}) | S_t = s, A_t                       = a \right] \\
   \label{eq: bellmanoptimalityequationforpi}
          &= \max_a \sum_{s',r} \Pr(s', r|s,a) \left[r + \gamma v_*(s')\right].
@@ -684,10 +754,38 @@ The last two equations are just two different forms of the Bellman optimality eq
   \end{tikzpicture}
   \caption{\footnotesize We draw a backup diagram for the Bellman optimality equation \ref{eq: bellmanoptimalityequationforpi} for $v_*$. Notice that we've added an arc to indicate that the agent's choice points to represent that the maximum over that choice is taken rather than the expected value given some policy.}
 \end{figure}
-The Bellman optimality equation for $q_*$ is
+
+\paragraph{Bellman \emph{optimality} equation for action-value function}
+The Bellman optimality equation for $q_*$ can be derived in a similar way, where we replace a summation over actions by a maximum, using a similar argument as above. Recall that
+\[
+q_\pi(s,a) = \sum_{s'} \sum_r\Pr(s', r|s,a) \left[ r + \gamma \sum_{a'} \pi(a',s')q_\pi(s',a')\right]
+\]
+and we can substitute in an optimal policy to yield
+\[
+  \color{purple} q_* \color{black} (s,a) = \sum_{s'} \sum_r \Pr(s',r|s,a) \left[ r + \gamma \sum_{a'} \color{orange} \pi_* \color{black} (a'|s') \color{purple} q_* \color{black}(s',a')\right].
+\]
+Making a similar argument as above, we can replace the use of a probability distribution $\pi_*(a',s')$ with a call to $\max_{a'}$, since our policy is optimal:
+\[
+  \color{purple} q_* \color{black} (s,a) = \sum_{s'} \sum_r \Pr(s',r|s,a) \left[ r + \gamma \color{purple} \max_{a'} \color{purple} q_* \color{black}(s',a')\right].  
+\]
+This yields the Bellman optimality equation for $q_*$. Writing it all out again in slightly different notation:
 \[
   q_*(s,a) = \mathbb E \left[R_{t+1} + \gamma \max_{a'} q_*(S_{t+1}, a') | S_t = s, A_t = a \right] = \sum_{s',r} \Pr(s', r|s,a) \left[r + \gamma \max_{a'} q_*(s', a') \right].
 \]
+We discussed previously that the Bellman equations allowed us to form a linear system of equations for which we could solve for the value-state functions. The Bellman optimality equation gives us a similar system of equations for the \emph{optimal} value.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node (math) at (0,0) {$\color{purple} \pi \color{black}, p, \gamma$};
+    \node[draw,rectangle] (solver) at (3,0) {Linear System Solver};
+    \node (v) at (6, 0) {$v_{\color{purple}\pi}$};
+    \draw[->] (math) -- (solver);
+    \draw[->] (solver) -- (v);
+  \end{tikzpicture}
+  \caption{\footnotesize A simple diagram showing how we can use a policy to determine a value-function.}
+\end{figure}
+One natural question is: can we solve this system in a similar way to find the optimal state-value function? Unfortunately, no, since the $\max$ operation over actions is not linear! Standard techniques from linear algebra no longer apply. In this course, we'll use other techniques based on the Bellman equations to compute value functions and policies. We might also wonder why we can't simply use $\pi_*$ in the ordinary Bellman equation to get a system of linear equations for $v_*$, but unfortunately we don't know $\pi_*$ (learning \emph{it} is the fundamental goal of RL).
+
 \begin{figure}[h]
   \centering
   \begin{tikzpicture}
@@ -712,9 +810,88 @@ The Bellman optimality equation for $q_*$ is
   \end{tikzpicture}
   \caption{\footnotesize We draw a backup diagram for the Bellman optimality equation for $q_*$.}
 \end{figure}
-For finite MDPs, the Bellman optimality equation for $v_*$ has a unique solution: it's actually a system of equations (one for each state), so if there are $n$ states or equations then there are also $n$ unknowns. If the dynamics $p$ of the environment are known, then in principle one can solve this system of equations for $v_*$ using any one of a variety of methods for solving systems of nonlinear equations. We can also solve a related set of equations for $q_*$.
 
-\paragraph{Using $v_*$ to determine an optimal policy} For each state $s$, there will be one or more actions at which the maximum is obtained in the Bellman optimality equation. Any policy that assigns nonzero probability \emph{only} to these actions is an optimal policy. This is akin to a one-step search: if you have the optimal value function $v_*$, then the actions that appear best after a one-step search will be optimal actions. Put differently, any policy that is \emph{greedy} with respect to the optimal evaluation function $v_*$ is an optimal policy. The beauty of $v_*$ is that if one uses it to evaluate teh short-term consequences of actions, specifically the one-step consequences, then a greedy policy is actually optimal in the long-term sense in which we are interested because $v_*$ already takes into account the reward consequences of all possible future behavior. I.e. $v_*$, the expected long run return, is turned into a quantity that is available locally and immediately available for each state. Whence, a one-step-ahead search yields the long-term optimal actions.
+For finite MDPs, the Bellman optimality equation for $v_*$ has a unique solution: it's actually a system of equations (one for each state), so if there are $n$ states or equations then there are also $n$ unknowns. If the dynamics $p$ of the environment are known, then in principle one can solve this system of equations for $v_*$ using any one of a variety of methods for solving systems of \emph{nonlinear} equations. We can also solve a related set of equations for $q_*$.
+
+\paragraph{Using $v_*$ to determine an optimal policy}
+Having learned about optimal value functions and the Bellman optimality equations, we might wonder why this all matters when our ultimate goal is not to find the \emph{value function} of an optimal policy but instead just the optimal policy itself! It turns out it's quite easy to go from an optimal value function to the associated optimal policy; the two goals are almost the same.
+Let us return to our grid-world problem from before.
+
+\begin{figure}[h]
+  \centering
+    \begin{tikzpicture}[scale=0.75]
+    \draw[step=1.0,black,thin] (0,0) grid (5, 5);
+    \node (a) at (1.5, 4.5) {$A$};
+    \node (ap) at (1.5, 0.5) {$A'$};
+    \path[->,purple] (a) edge[bend left = 20] (ap);
+    \node (b) at (3.5,4.5) {$B$};
+    \node (bp) at (3.5, 2.5) {$B'$};
+    \path[->,purple] (b) edge[bend left = 20] (bp);
+    \node[below = 1mm of b] {$\scriptstyle +5$};
+    \node[below = 2mm of a] {$\scriptstyle +10$};
+    \foreach \x in {1.5, 2.5, 3.5} {
+      \path[->] (\x-0.1, 0) edge[loop below,gray,distance=4mm] (\x+0.1, 0);
+    }
+    \path[->] (5, 4.6) edge[loop right,gray,distance=4mm] node[right] {$-1$}       (5, 4.4);
+    \foreach \y in {3.5, 2.5, 1.5, 0.5} {
+      \path[->] (5, \y+.1) edge[loop right,gray,distance=4mm] (5, \y-.1);
+      \path[->] (0, \y+.1) edge[loop left ,gray,distance=4mm] (0, \y-.1);
+    }
+    \path[->] (2.4, 5) edge[loop above,gray,distance=4mm] (2.6, 5);
+    \node[gray] at (-0.3, 2.8) {$-1$};
+  \end{tikzpicture}
+\end{figure}
+
+Let's hold off on the question of how to find an optimal value function, but instead take the associated optimal values for each state as given.
+
+\begin{figure}[h]
+  \centering
+    \begin{tikzpicture}
+    \draw[step=1.0,black,thin] (0,0) grid (5, 5);
+    % Bottom row
+    \node at (0.5, 0.5) {$14.4$};
+    \node at (1.5, 0.5) {$16.0$};
+    \node at (2.5, 0.5) {$14.4$};
+    \node at (3.5, 0.5) {$13.0$};
+    \node at (4.5, 0.5) {$11.7$};
+    % Second to last row from bottom
+    \node at (0.5, 1.5) {$16.0$};
+    \node at (1.5, 1.5) {$17.8$};
+    \node at (2.5, 1.5) {$16.0$};
+    \node at (3.5, 1.5) {$14.4$};
+    \node at (4.5, 1.5) {$13.0$};
+    % Middle row
+    \node at (0.5, 2.5) {$17.8$};
+    \node at (1.5, 2.5) {$19.8$};
+    \node at (2.5, 2.5) {$17.8$};
+    \node at (3.5, 2.5) {$16.0$};
+    \node at (4.5, 2.5) {$14.4$};
+    % Second row from top
+    \node at (0.5, 3.5) {$19.8$};
+    \node at (1.5, 3.5) {$22.0$};
+    \node at (2.5, 3.5) {$19.8$};
+    \node at (3.5, 3.5) {$17.8$};
+    \node at (4.5, 3.5) {$16.0$};
+    % Top row
+    \node at (0.5, 4.5) {$22.0$};
+    \node at (1.5, 4.5) {$24.4$};
+    \node at (2.5, 4.5) {$22.0$};
+    \node at (3.5, 4.5) {$19.4$};
+    \node at (4.5, 4.5) {$17.5$};
+    % Gamma factor for clarity.
+    \node at (4, 5.5) {$\gamma = 0.9$};
+  \end{tikzpicture}
+  \caption{\footnotesize Notice that unlike before, the values along the bottom row are not negative. Unlike the uniform random policy, the optimal policy won't ever choose to bump into the walls. As a consequence, the value of state $A$ is also much higher than the immediate reward of $+10$.}
+\end{figure}
+
+In general, having $v_*$ makes it relatively easy to work out the optimal policy as long as we also have access to the dynamics function $p$. For any state, we can look at each available action and evaluate the following:
+\begin{align*}
+  v_*(s) &= \max_a \sum_{s'} \sum_r \Pr(s',r|s,a) \left[ r + \gamma   \color{purple} v_* \color{black}(s')\right] \\
+  \pi_*(s) &= \argmax_a \underbrace{\sum_{s'} \sum_r \Pr(s',r|s,a)\left[r+\gamma \color{purple} v_* \color{black}(s')\right]}
+\end{align*}
+
+
+For each state $s$, there will be one or more actions at which the maximum is obtained in the Bellman optimality equation. Any policy that assigns nonzero probability \emph{only} to these actions is an optimal policy. This is akin to a one-step search: if you have the optimal value function $v_*$, then the actions that appear best after a one-step search will be optimal actions. Put differently, any policy that is \emph{greedy} with respect to the optimal evaluation function $v_*$ is an optimal policy. The beauty of $v_*$ is that if one uses it to evaluate the short-term consequences of actions, specifically the one-step consequences, then a greedy policy is actually optimal in the long-term sense in which we are interested because $v_*$ already takes into account the reward consequences of all possible future behavior. I.e. $v_*$, the expected long run return, is turned into a quantity that is available locally and immediately available for each state. Whence, a one-step-ahead search yields the long-term optimal actions.
 \paragraph{Using $q_*$ to determine optimal actions} With $q_*$, the agent does not even have to do a one-step-ahead search: for any state $s$ it can simply find any action that maximizes $q_*(s,a)$. The action-value function effectively caches the results of all one-step-ahead searches. Hence, at the cost of representing a function of state-action pairs instead of just states, the optimal action value function allows optimal actions to be selected without having to know anything about possible successor states and their values, i.e. without having to know anything about the environment's dynamics.
 
 \paragraph{Downsides of explicitly solving Bellman optimality equation} The approach is rarely directly useful, since it's akin to an exhaustive search which looks ahead at all possibilities, computes their probabilities of occurrence and their desireabilities in terms of expected rewards. This solution relies on three assumptions that are rarely true in practice:
