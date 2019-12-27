@@ -1109,4 +1109,41 @@ A policy's \emph{value functions} assign to each state (or state-action pair) th
 
 Even if the agent has a complete and accurate environment model, the agent is typically unable to perform enough computation per time step to fully use it. The memory available is also an important constraint, since memory may be required to build up accurate approximations of value functions, policies, and models. In most cases of interest, there are far more states than could possibly be entries in a table, and approximations must be made.
 
+\section{Dynamic Programming}
+The key idea of reinforcement learning is the use of value functions to organize and structure the search for good policies. This section is about demonstrating how dynamic programming (DP) can be used to obtain optimal policies once we have found optimal value functions, $v_*$ or $q_*$, which satisfy the Bellman optimality equations. DP algorithms are obtained by turning Bellman equations into update rules for improving approximations of the desired value functions.
+
+\subsection{Policy Evaluation (Prediction)} Let's consider how to compute the state-value function $v_\pi$ for arbitrary policy $\pi$; in the literature this is known as \emph{policy evaluation}, but we also refer to it as the \emph{prediction problem}. Recall that
+\begin{align}
+  v_\pi(s) &\coloneqq \mathbb E_\pi \left[ G_t | S_t = s \right] \nonumber \\
+           &= \mathbb E_\pi \left[ R_{t+1} + \gamma G_{t+1} | S_t = s \right] \nonumber  \\
+           &= \mathbb E_\pi \left[ R_{t+1} + \gamma v_\pi(S_{t+1}) | S_t = s                           \right] \nonumber  \\
+  \label{eq: framingthepredictionproblem}
+           &= \sum_a \pi(a|s) \sum_{s', r} \Pr(s',r|s,a) \left[ r + \gamma v_\pi(s')\right],
+\end{align}
+where $\pi(a|s)$ is the probability of taking action $a$ in state $s$ under policy $\pi$, and the expectations are subscripted by $\pi$ to denote that they are conditioned on $\pi$ being followed. Existence and uniqueness of $v_\pi$ are guaranteed as long as $\gamma < 1$ or eventual termination is guaranteed from all states under policy $\pi$. If the environment dynamics are completely known, then equation \ref{eq: framingthepredictionproblem} is a system of $|\mathcal S|$ simultaneous linear equations in $|\mathcal S|$ unknowns, i.e. the $v_\pi(s)$ for each $s \in \mathcal S$. Instead of using direct solvers, lets consider a sequence of \emph{approximate} value functions, $v_0, v_1, v_2, \ldots$ which each map $\mathcal S^+$ to $\mathbb R$ (the real numbers). The initial approximation $v_0$ may be chosen arbitrarily, but each successive update may be obtained by using the Bellman equation for $v_\pi$ \ref{eq:   framingthepredictionproblem} as an update rule:
+\begin{align}
+  \label{eq: expectedupdate}
+  v_{k+1}(s) &\coloneqq \mathbb E_\pi \left[R_{t+1} + \gamma v_k(S_{t+1}) | S_t     = s \right] \\
+&= \sum_a \pi(a|s) \sum_{s',r} \Pr(s',r|s,a) \left[ r + \gamma v_k(s')\right] \nonumber
+\end{align}
+for all $s \in \mathcal S$. Realize that $v_k = v_\pi$ is a fixed-point for this update rule because the Bellman equation for $v_\pi$ assures us of equality in this case. The sequence $\{v_k\}$ can be shown in general to converge to $v_\pi$ as $k\to \infty$ under the same conditions that guarantee the existence of $v_\pi$.
+
+\paragraph{Expected updates} To produce each successive approximation, $v_{k+1}$ from $v_k$, the iterative policy evaluation applies the same operation to each state $s$: it replaces the old value of $s$ with a new value obtained from the old values of the successor states of $s$, and the expected immediate rewards, along all the one-step transitions possible under the policy being evaluated. Such an operation is referred to as an \emph{expected update}. Each iteration of policy evaluation updates the value of every state once to produce a new approximate value function $v_{k+1}$.
+
+\paragraph{In-place updates} To write the sequential compute program to implement iterative policy evaluation as given by update rule \ref{eq: expectedupdate}, you would naively have to use two arrays: one for the old values $v_k(s)$ and another for the new values $v_{k+1}(s)$. With these two arrays, the new values can be computed one by one from the old values without the old values being changed. It's instead easier to implement ``in place'', with each new value immediately overwriting the old one. Depending on the order in which the states are updated, sometimes new values are used instead of old ones on the right hand side of \ref{eq: expectedupdate}. This in-place algorithm also converges to $v_\pi$ and usually faster than the two-array version, since we use new data as soon as they are available.
+
+\begin{algorithm}
+  \caption{Iterative Policy Evaluation, for estimating $v_\pi$} 
+  \KwInput{$\pi$, the policy to be evaluated; algorithm parameter: a small     threshold $\theta > 0$ determining accuracy of estimation}
+  Initialize $V(s)$ for all $s \in \mathcal S^+$, arbitrarily except that   $V(\textrm{terminal}) = 0$. \\
+\While{$\Delta \geq \theta$} {
+  $\Delta \gets 0$ \\
+  \For{$s \in \mathcal S$} {
+    $v \gets V(s)$\\
+    $V(s) \gets \sum_a \pi(a|s) \sum_{s',r} \Pr(s', r| s, a) \left[ r + \gamma       V(s')\right]$ \\
+    $\Delta \gets \max\left(\Delta, |v - V(s)|\right)$
+  }
+}
+\end{algorithm}
+
 \end{document}
