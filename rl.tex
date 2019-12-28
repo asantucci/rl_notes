@@ -1146,4 +1146,131 @@ for all $s \in \mathcal S$. Realize that $v_k = v_\pi$ is a fixed-point for this
 }
 \end{algorithm}
 
+\paragraph{Grid-world example} We consider the $4 \times 4$ gridworld shown below.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \draw[<->,thick] (-4, 2) -- (-2, 2);
+    \draw[<->,thick] (-3, 1) -- (-3, 3);
+    \node at (-3, 0.5) {actions};
+    \draw[step=1.0,black,thin] (0,0) grid (4, 4);
+    \fill[gray!50] (0, 3) rectangle (1,4);
+    \fill[gray!50] (3, 0) rectangle (4,1);
+    % Top row.
+    \node at (1.25, 3.25) {\scriptsize 1};
+    \node at (2.25, 3.25) {\scriptsize 2};
+    \node at (3.25, 3.25) {\scriptsize 3};
+    % Second frop top row.
+    \node at (0.25, 2.25) {\scriptsize 4};
+    \node at (1.25, 2.25) {\scriptsize 5};
+    \node at (2.25, 2.25) {\scriptsize 6};
+    \node at (3.25, 2.25) {\scriptsize 7};
+    % Second from bottom row.
+    \node at (0.25, 1.25) {\scriptsize 8};
+    \node at (1.25, 1.25) {\scriptsize 9};
+    \node at (2.25, 1.25) {\scriptsize 10};
+    \node at (3.25, 1.25) {\scriptsize 11};
+    % Bottom row.
+    \node at (0.25, 0.25) {\scriptsize 12};
+    \node at (1.25, 0.25) {\scriptsize 13};
+    \node at (2.25, 0.25) {\scriptsize 14};
+    \node at (6, 2) {$\substack{R_1 = -1 \\ \textrm{on all transitions}}$};
+  \end{tikzpicture}
+  \caption{\footnotesize The non-terminal states are $\{1, 2, \ldots, 14\}$, and there are four possible actions in each state $\mathcal A = \{\texttt{up}, \texttt{down}, \texttt{right}, \texttt{left}\}$, which deterministically cuase the corresponding state transitions, except that actions which would take the agent off the grid in fact leave the state unchanged. In the notation of $\Pr(s',r|s,a)$ we have examples like $\Pr(6,-1|5,\texttt{right}) = 1$, or $\Pr(7, -1 | 7, \texttt{right}) = 1$, as well as $\Pr(10,r|5,\texttt{right}) = 0$ for all $r \in \mathcal R$. This is an undiscounted, episodic task. The reward is $-1$ on all transitions until the terminal state is reached, which is denoted by a gray shaded region(s); although shown in two places, it is formally one state. The expected reward function is thus $r(s,a,s') = -1$ for all states $s,s'$ and actions $a$. Suppose the agent chooses the equiprobable random policy (where all actions are equally likely). The function $v_\pi$ gives for each state the negated expected number of steps from that state until termination.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[scale=2/3]
+    \node at (-2, 5) {$\substack{v_k \textrm{ for the } \\ \textrm{random policy}}$};
+    \node at (3, 5) {$\substack{\textrm{greedy policy} \\ \textrm{w.r.t. }         v_k}$};
+    % We first draw out all grids simultaneously, sparing values and policies %themselves.
+    \foreach \y in {0, -1.25, ..., -6.25} {
+      \draw[step=1.0,black,thin] (-4,\y*4) grid (0, \y*4+4);      
+      \draw[step=1.0,black,thin] (1,\y*4) grid (5, \y*4+4);
+      \fill[gray!50] (1, \y*4+3) rectangle (2,\y*4+4);
+      \fill[gray!50] (4, \y*4) rectangle (5,\y*4+1);
+    }
+    % For k=0.
+    \node at (-5.5, 2) {$k=0$};
+    \foreach \x in {-3.5, ..., -0.5} {
+      \foreach \y in {0.5, ..., 3.5} {
+        \node at (\x, \y) {\scriptsize 0.0};
+      }
+    }
+    \foreach \x in {-2.5, ..., -0.5} {
+      \foreach \y in {1.5, ..., 3.5} {
+        \node at (\x + 5, \y) {$\big\uparrow$};
+        \node at (\x + 5, \y) {$\big\downarrow$};
+        \node at (\x + 5, \y) {$\longleftarrow$};
+        \node at (\x + 5, \y) {$\longrightarrow$};
+      }
+    }
+    \foreach \y in {0.5, ..., 2.5} {
+      \node at (1.5, \y) {$\big\uparrow$};
+      \node at (1.5, \y) {$\big\downarrow$};
+      \node at (1.5, \y) {$\longleftarrow$};
+      \node at (1.5, \y) {$\longrightarrow$};
+    }
+    \foreach \x in {2.5, 3.5} {
+      \node at (\x, 0.5) {$\big\uparrow$};
+      \node at (\x, 0.5) {$\big\downarrow$};
+      \node at (\x, 0.5) {$\longleftarrow$};
+      \node at (\x, 0.5) {$\longrightarrow$};
+    }
+    % For k = 1.
+    \node at (-5.5,-3) {$k=1$};
+    \node at (-5.5,-8) {$k=2$};
+    \node at (-5.5,-13) {$k=3$};
+    \node at (-5.5,-18) {$k=10$};
+    \node at (-5.5,-23) {$k=\infty$};
+  \end{tikzpicture}
+\end{figure}
+
+\subsection{Policy Improvement}
+The reason we care to compute the value function for a policy is such that we can use it to help find better policies. Suppose we've determined the value function $v_\pi$ for an \emph{arbitrary} deterministic policy $\pi$. For some state $s$, we'd like to know whether we should change the policy to deterministically choose an action $a \neq \pi(s)$. Of course, we know how good it is to follow the current policy from $s$, i.e. $v_\pi(s)$, but would it be better or worse to switch to a new policy? Consider selecting $a$ in $s$ and thereafter following the existing policy $\pi$. The value of \emph{this} way of behaving is given by
+\begin{equation}
+  \label{eq: takingactionathenfollowingpolicypithereafter}
+  q_\pi(s,a) \coloneqq \mathbb E \left[ R_{t+1} + \gamma v_\pi(S_{t+1}) | S_t =     s, A_t = a \right] = \sum_{s',r} \Pr(s',r | s,a) \left[ r + \gamma v_\pi(s')\right].
+\end{equation}
+We'd like to know how this quantity compares to $v_\pi(s)$. We would intuitively expect that if it is better to select $a$ once in $s$ and thereafter follow $\pi$ relative to just following $\pi$ all the time, that we could improve our policy further still by just taking action $a$ \emph{every} time we encounter $s$. It turns out this is a special case of a general result called the \emph{policy improvement theorem}. Let $\pi$ and $\pi'$ be any pair of deterministic policies such that for all $s \in \mathcal S$,
+\begin{equation}
+  \label{eq: policyimprovementthm}
+  q_\pi(s, \pi'(s)) \geq v_\pi(s)
+\end{equation}
+then policy $\pi'$ must be as good as or better than $\pi$; i.e. it must obtain greater than or equal expected return for all states $s \in \mathcal S$: $v_{\pi'}(s) \geq v_\pi(s)$. If equation \ref{eq: policyimprovementthm} holds with \emph{strict} equality then it follows that $v_{\pi'}(s) > v_\pi(s)$. The proof behind the policy improvement theorem is easy to understand. Starting from \ref{eq: policyimprovementthm}, we continually expand out using equation \ref{eq: takingactionathenfollowingpolicypithereafter} and reapply \ref{eq:   policyimprovementthm} until we get $v_{\pi'}(s)$.
+
+\begin{align*}
+  v_\pi(s) &\leq q_\pi\left(s, \pi'(s)\right) \\
+          &= \mathbb E \left[R_{t+1} + \gamma v_\pi(S_{t+1}) | S_t = s, A_t = \pi'(s)\right] &\textrm{by \ref{eq: takingactionathenfollowingpolicypithereafter}}  \\
+           &= \mathbb E_{\color{purple}\pi'} \left[R_{t+1} + \gamma              v_\pi(S_{t+1}) | S_t = s \right]
+          &\leq \mathbb E_{\pi'} \left[R_{t+1} + \gamma q_\pi(S_{t+1},             \pi'(S_{t+1})) | S_t = s\right] &\textrm{by \ref{eq: policyimprovementthm}} \\
+           &= \mathbb E_{\pi'} \left[R_{t+1} + \gamma \mathbb E_{\pi'} \left[R_{t+2} + \gamma v_\pi(S_{t+2}) | S_{t+1}, A_{t+1} = \pi'(S_{t+1})\right]              | S_t = s \right] \\
+           &= \mathbb E_{\pi'} \left[R_{t+1} + \gamma R_{t+2} + \gamma^2              v_\pi(S_{t+2}) | S_t = s \right] \\
+           &\leq \mathbb E_{\pi'} \left[R_{t+1} + \gamma R_{t+2} + \gamma^2              R_{t+3} + \gamma^3 v_\pi(S_{t+3}) | S_t = s \right] \\
+           &\vdots \\
+           &\leq \mathbb E_{\pi'} \left[R_{t+1} + \gamma R_{t+2} + \gamma^2              R_{t+3} + \gamma^3 R_{t+4} + \ldots | S_t = s \right] \\
+           &= v_{\pi'}(s).
+\end{align*}
+So far we've seen how, given a policy and its value function, how to easily evaluate a change in the policy at a single state to a particular action. It's natural extension to consider changes at \emph{all} states and to \emph{all} possible actions, selecting at each state the action that appears to be best according to $q_\pi(s,a)$. I.e, define a \emph{greedy} policy $\pi'$ given by
+\begin{equation}
+  \label{eq: greedypolicy}
+  \pi'(s) \coloneqq \argmax_a q_\pi(s,a) = \argmax_a \mathbb E \left[R_{t+1} + \gamma v_\pi(S_{t+1}) | S_t = s, A_t = a \right] = \argmax_a \sum_{s',r} \Pr(s',r|s,a) \left[ r + \gamma v_\pi(s')\right].
+\end{equation}
+\paragraph{Policy improvement}
+In the even that there are multiple actions attaining a maximal value, we may break ties arbitrarily. By construction, the greedy policy meets the condition of the policy improvement theorem \ref{eq: policyimprovementthm} and so we know it's at least as good as the original policy. This process of making a new policy that improves upon an original policy, by making it greedy with respect  to the value function of the original policy, is called \emph{policy   improvement}.
+
+\paragraph{Why policy improvement gives us a strictly better policy} Suppose toward contradiction that the new greedy policy $\pi'$ is as good as, but not better than, the old policy $\pi$. Then, $v_\pi = v_{\pi'}$, and from equation
+\ref{eq: greedypolicy} it follows that for all $s \in \mathcal S$:
+\[
+  v_{\pi'}(s) = \max_a \mathbb E \left[R_{t+1} + \gamma v_{\pi'}(S_{t+1}) | S_t= s | A_t = a \right] = \max_a \sum_{s',r} \Pr(s',r|s,a)\left[r + \gamma v_{\pi'}(s)\right].
+\]
+But, realize this is the same as the Bellman optimality equation! Therefore, $v_{\pi'}$ must be $v_*$, and both $\pi$ and $\pi'$ must be optimal policies. I.e. policy improvement therefore must give a strictly better policy except when the original policy is already optimal.
+
+\paragraph{Stochastic optimal policies} The policy improvement theorem carries through as stated for the stochastic case where a policy $\pi$ specifies probabilities $\pi(a|s)$ for taking each action $a$ in each state $s$. If there are ties in the policy improvement steps such as \ref{eq: greedypolicy}, i.e. if there are several actions at which the maximum is achieved, then in the stochastic case we can allocate a portion of the probability of being selected in the new greedy policy to each of these maximizing actions; any portioning scheme is allowed so long as all submaximal actions are given zero probability.
+
+\subsection{Policy Iteration}
+\subsection{Value Iteration}
+\subsection{Generalized Policy Iteration}
+\subsection{Efficiency of Dynamic Programming}
 \end{document}
