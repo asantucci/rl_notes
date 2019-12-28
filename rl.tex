@@ -1112,7 +1112,34 @@ Even if the agent has a complete and accurate environment model, the agent is ty
 \section{Dynamic Programming}
 The key idea of reinforcement learning is the use of value functions to organize and structure the search for good policies. This section is about demonstrating how dynamic programming (DP) can be used to obtain optimal policies once we have found optimal value functions, $v_*$ or $q_*$, which satisfy the Bellman optimality equations. DP algorithms are obtained by turning Bellman equations into update rules for improving approximations of the desired value functions.
 
-\subsection{Policy Evaluation (Prediction)} Let's consider how to compute the state-value function $v_\pi$ for arbitrary policy $\pi$; in the literature this is known as \emph{policy evaluation}, but we also refer to it as the \emph{prediction problem}. Recall that
+\paragraph{Policy evaluation vs. control}
+We often talk about two distinct tasks: policy evaluation and control. Policy evaluation is the task of determining the value function for a specific policy. Control is the task of finding a policy that obtains as much reward as possible, i.e. finding a policy which maximizes the value function. Although control is the ultimate goal of RL, the task of policy evaluation is a necessary first step, since it's hard to improve our policy if we don't have a way to assess how good it is. DP algorithms use the Bellman equations to define iterative algorithms for both policy evaluation and control. Schematically,
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    % Policy eval
+    \node (vars) at (0, 0) {$\pi, p, \gamma$};
+    \node[draw,rectangle] (dp1) at (3, 0) {$\substack{\textrm{Dynamic} \\         \textrm{Programming}}$};
+    \node (vpi)  at (6, 0) {$v_{\pi}$};
+    \node[right = 1mm of vpi] {Policy Evaluation};
+    \draw[->] (vars) -- (dp1);
+    \draw[->] (dp1) -- (vpi);
+    % Control
+    \node (varsbottom) at (0, -1) {$p, \gamma$};
+    \node[draw,rectangle] (dp2) at (3, -1) {$\substack{\textrm{Dynamic} \\         \textrm{Programming}}$};
+    \node (pistar)  at (6, -1) {$\pi_*$};
+    \node[right = 1mm of pistar] {Control};
+    \draw[->] (varsbottom) -- (dp2);
+    \draw[->] (dp2) -- (pistar);
+  \end{tikzpicture}
+  \caption{\footnotesize DP uses the various Bellman equations along with knowledge of $p$ to work out value functions and optimal policies. Classical DP does not involve interaction with the environment at all. It turns out that most RL algorithms can be seen as an approximation to DP programming without the model of the MDP specified?}
+\end{figure}
+
+
+% Recall that \emph{control} is the task of improving a policy, and that a policy % $\pi_2$ is considered as good or better than $\pi_1$ if the value under $\pi_2$ % is greater than or equal to the value under $\pi_1$ in every state; $\pi_2$ is % \emph{strictly} better if $\pi_2$ is as good or better than $\pi_1$ \emph{and} % there's at least one state in $\pi_2$ where the value under $\pi_2$ is strictly % greater than the value under $\pi_1$. The goal of the control task is to modify % a policy to produce a new one which is strictly better; we can try to improve % our policy repeatedly to obtain a sequence of better and better policies.
+
+\subsection{Policy Evaluation (Prediction)} Let's consider how to compute the state-value function $v_\pi$ for arbitrary policy $\pi$; in the literature this is known as \emph{policy evaluation}, but we also refer to it as the \emph{prediction problem}. I.e our task is to learn a mapping $\pi \longrightarrow v_\pi$. Recall that
 \begin{align}
   v_\pi(s) &\coloneqq \mathbb E_\pi \left[ G_t | S_t = s \right] \nonumber \\
            &= \mathbb E_\pi \left[ R_{t+1} + \gamma G_{t+1} | S_t = s \right] \nonumber  \\
@@ -1120,7 +1147,24 @@ The key idea of reinforcement learning is the use of value functions to organize
   \label{eq: framingthepredictionproblem}
            &= \sum_a \pi(a|s) \sum_{s', r} \Pr(s',r|s,a) \left[ r + \gamma v_\pi(s')\right],
 \end{align}
-where $\pi(a|s)$ is the probability of taking action $a$ in state $s$ under policy $\pi$, and the expectations are subscripted by $\pi$ to denote that they are conditioned on $\pi$ being followed. Existence and uniqueness of $v_\pi$ are guaranteed as long as $\gamma < 1$ or eventual termination is guaranteed from all states under policy $\pi$. If the environment dynamics are completely known, then equation \ref{eq: framingthepredictionproblem} is a system of $|\mathcal S|$ simultaneous linear equations in $|\mathcal S|$ unknowns, i.e. the $v_\pi(s)$ for each $s \in \mathcal S$. Instead of using direct solvers, lets consider a sequence of \emph{approximate} value functions, $v_0, v_1, v_2, \ldots$ which each map $\mathcal S^+$ to $\mathbb R$ (the real numbers). The initial approximation $v_0$ may be chosen arbitrarily, but each successive update may be obtained by using the Bellman equation for $v_\pi$ \ref{eq:   framingthepredictionproblem} as an update rule:
+where $\pi(a|s)$ is the probability of taking action $a$ in state $s$ under policy $\pi$, and the expectations are subscripted by $\pi$ to denote that they are conditioned on $\pi$ being followed. Recall that the Bellman equation reduces the problem of finding $v_\pi$ to a system of linear equations, one equation for each state. So, the problem of policy evaluation reduces to solving this system of linear equations, and in principle we can take a variety of methods from linear algebra to do so.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node (vars) at (0, 0) {$\color{purple} \pi \color{black}, p, \gamma$};
+    \node[draw,rectangle] (solv) at (3, 0) {$\substack{\textrm{Linear System} \\         \textrm{Solver}}$};
+    \node (vpi)  at (6, 0) {$v_{\color{purple} \pi}$};
+    \draw[->] (vars) -- (solv);
+    \draw[->] (solv) -- (vpi);
+  \end{tikzpicture}
+\end{figure}
+
+Existence and uniqueness of $v_\pi$ are guaranteed as long as $\gamma < 1$ or eventual termination is guaranteed from all states under policy $\pi$. If the environment dynamics are completely known, then equation \ref{eq: framingthepredictionproblem} is a system of $|\mathcal S|$ simultaneous linear equations in $|\mathcal S|$ unknowns, i.e. the $v_\pi(s)$ for each $s \in \mathcal S$.
+
+\paragraph{Iterative solutions}
+In practice, iterative solution methods of DP are more suitable for general MDPs. I.e. instead of using direct solvers, lets consider a sequence of \emph{approximate} value functions, $v_0, v_1, v_2, \ldots$ which each map $\mathcal S^+$ to $\mathbb R$ (the real numbers). 
+The initial approximation $v_0$ may be chosen arbitrarily, but each successive update may be obtained by using the Bellman equation for $v_\pi$ \ref{eq:   framingthepredictionproblem} as an update rule:
 \begin{align}
   \label{eq: expectedupdate}
   v_{k+1}(s) &\coloneqq \mathbb E_\pi \left[R_{t+1} + \gamma v_k(S_{t+1}) | S_t     = s \right] \\
