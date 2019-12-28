@@ -1386,12 +1386,30 @@ The evaluation and improvement processes in GPI are both competing and cooperati
 \begin{figure}[h]
   \centering
   \begin{tikzpicture}
-    \draw (0, 1) -- (3, 0);  % y = 1 - 1/3*x.
-    \draw (0.25,-1.5) -- (3, 0);
-    \node[draw,circle,fill,scale=1/2,blue!50] (init) at (0, 0.5) {};
-    \node[draw,circle,fill,scale=1/2,blue!50] (one) at (-1.25, 0.923) {};
+    \draw (-4, 2) -- (0, 0) node[above left = 3mm, rotate = -28] {$v = v_\pi$};  % y = -1/2x
+    \draw (-3.5,-1.16666) -- (0, 0) node[below left, rotate=20] {$\pi =       \textrm{greedy}(v)$}; % y= 1/3*x
+    \node at (0.5, 0) {$v_*, \pi_*$};
+    \node[draw,circle,fill,scale=1/4,blue!50] (init) at (-4, 0.25) {};
+    \node[below = 1mm of init] {$\scriptstyle v,\pi$};
+    \node[draw,circle,fill,scale=1/4,blue!50] (one)  at (-3.5, 1.75) {};
+    \node[draw,circle,fill,scale=1/4,blue!50] (two)  at (-3, -1) {};
+    \node[draw,circle,fill,scale=1/4,blue!50] (three)at (-2.5, 1.25) {};
+    \node[draw,circle,fill,scale=1/4,blue!50] (four) at (-2, -2/3) {};
+    \node[draw,circle,fill,scale=1/4,blue!50] (five) at (-1.5, 0.75) {};
+    \node[draw,circle,fill,scale=1/4,blue!50] (six)  at (-1, -1/3) {};
+    \draw[->,blue!50] (init) -- (one);
+    \draw[->,blue!50] (one) -- (two);
+    \draw[->,blue!50] (two) -- (three);
+    \draw[->,blue!50] (three) -- (four);
+    \draw[->,blue!50] (four) --(five);
+    \draw[->,blue!50] (five) -- (six);
   \end{tikzpicture}
+  \caption{\footnotesize We can think of the nteraction between the evaluation and improvement processes in GPI in terms of two constraints or goals -- for example as two lines in two-dimensional space as suggested by the diagram. Although the real geometry is much more complicated, the diagram suggests what happens in the real case. Each process drives the value function or policy toward one of the lines representing a solution to one of the two goals. The goals \emph{interact} because the lines are not orthogonal: driving directly toward one goal causes some movement away from the other goal; inevitably, however, the joint process is brought closer to the overall goal of optimality. The arrows in the diagram correspond to the behavior of policy iteration in that each takes the system all the way to achieving one of the two goals completely. In GPI, one could also take smaller, incomplete steps toward each goal. In either case, the two processes together achieve the overall goal of optimality even though neither is attempting to achieve it directly!}
 \end{figure}
 
 \subsection{Efficiency of Dynamic Programming}
+For very large problems, DP is not practical. But, compared with other methods for solving MDPs, DP methods are actually quite efficient. The worst case work required by DP methods to find an optimal policy is polynomial in the number of states and actions. If $n$ and $k$ denote the number of states and actions, this means that a DP method takes a number of computational operations that is less than some polynomial function of $n$ and $k$. Note that we find an optimal policy in polynomial time even tohugh the total number of (deterministic) policies is $k^n$; in this sense, DP is exponentially faster than any direct search in policy space could be. DP is sometimes thought to be of limited applicability because of the \emph{curse of dimensionality}, the fact that the number of states often grows exponentially with the number of state variables. Although it's true that large state sets create difficulties, these are inherent difficulties in the problem not of DP as a solution method. DP is in fact comparatively better suited to handling large state spaces than competing methods such as direct search and linear programming.
+
+\subsection{Summary}
+
 \end{document}
