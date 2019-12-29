@@ -1481,5 +1481,17 @@ The key insight to DP is that we don't have to treat the evaluation of each stat
 Here, we simply evaluate every possible deterministic policy one at a time. We then select the one with the highest value. Since there are a finite number of deterministic policies, there always exists an optimal deterministic policy. So, brute-force search will find the answer eventually. However, the number of deterministic policies can be huge. Because a deterministic policy consists of one action choice per state, the total number of deterministic policies is exponential in the number of states; i.e. there are $|\mathcal S|$ states, and for each we have to consider from $|\mathcal A|$ different actions, this leads to multiplying $|\mathcal A|$ by itself $|\mathcal S|$ times: $|\mathcal A|^{|\mathcal S|}$. On the other hand, the policy improvement theorem guarantees that policy iteration will find a sequence of better and better policies: this is a significant improvement over exhaustively searching each and every policy. 
 
 \subsection{Summary}
-
+Policy evaluation is the task of determining the state-value function $v_\pi$ for a particular policy $\pi$. Iterative policy evaluation takes the Bellman equation for $v_\pi$,
+\[
+  v_\pi(s) = \sum_a \pi(a|s) \sum_{s'} \sum_r \Pr(s',r|s,a)\left[r + \gamma v_\pi(s')\right]
+\]
+and turns it into an update rule, producing better and better approximations for $v_\pi$:
+\[
+  v_{k+1} \gets \sum_a \pi(a|s) \sum_{s'} \sum_r \Pr(s',r|s,a) \left[ r + \gamma v_k(s')\right].
+\]
+Control refers to the task of improving a policy. The policy improvement theorem tells us how to construct a better policy from a given policy:
+\[
+  \pi'(s) \coloneqq \argmax_a \sum_{s'} \sum_r \Pr(s',r|s,a) \left[ r + \gamma v_\pi(s')\right].
+\]
+The new policy $\pi'$ is produced by ``greedifying'' with respect to current values. We are guaranteed to yield a better policy unless what we started with was already optimal. The DP algorithm for control is built upon the policy improvement theorem; this algorithm is called policy iteration. It consists of two steps: policy evaluation and improvement. In policy evaluation, we find the value function for the current policy. Policy improvement or ``greedification'' makes the policy greedy with respect to the current value functions. These steps are repeated over and over until the policy doesn't change, in which case we are guaranteed to have found an optimal policy. We discussed the framework of generalized policy iteration, in which the evaluation and improvement steps need not be run to completion; one example is the value iteration algorithm. Generalized policy iteration also includes asynchronous methods, which can more efficiently propagate value information This can be particularly helpful if the state space is very large.
 \end{document}
