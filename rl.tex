@@ -1170,11 +1170,11 @@ The initial approximation $v_0$ may be chosen arbitrarily, but each successive u
   v_{k+1}(s) &\coloneqq \mathbb E_\pi \left[R_{t+1} + \gamma v_k(S_{t+1}) | S_t     = s \right] \\
 &= \sum_a \pi(a|s) \sum_{s',r} \Pr(s',r|s,a) \left[ r + \gamma v_k(s')\right] \nonumber
 \end{align}
-for all $s \in \mathcal S$. Realize that $v_k = v_\pi$ is a fixed-point for this update rule because the Bellman equation for $v_\pi$ assures us of equality in this case. The sequence $\{v_k\}$ can be shown in general to converge to $v_\pi$ as $k\to \infty$ under the same conditions that guarantee the existence of $v_\pi$.
+for all $s \in \mathcal S$. Realize that $v_k = v_\pi$ is a fixed-point for this update rule because the Bellman equation for $v_\pi$ assures us of equality in this case. The sequence $\{v_k\}$ can be shown in general to converge to $v_\pi$ as $k\to \infty$ under the same conditions that guarantee the existence of $v_\pi$. In practice, once $v_{k+1} = v_k$ for all states, then $v_{k} = v_\pi$ and we have found the value function.
 
 \paragraph{Expected updates} To produce each successive approximation, $v_{k+1}$ from $v_k$, the iterative policy evaluation applies the same operation to each state $s$: it replaces the old value of $s$ with a new value obtained from the old values of the successor states of $s$, and the expected immediate rewards, along all the one-step transitions possible under the policy being evaluated. Such an operation is referred to as an \emph{expected update}. Each iteration of policy evaluation updates the value of every state once to produce a new approximate value function $v_{k+1}$.
 
-\paragraph{In-place updates} To write the sequential compute program to implement iterative policy evaluation as given by update rule \ref{eq: expectedupdate}, you would naively have to use two arrays: one for the old values $v_k(s)$ and another for the new values $v_{k+1}(s)$. With these two arrays, the new values can be computed one by one from the old values without the old values being changed. It's instead easier to implement ``in place'', with each new value immediately overwriting the old one. Depending on the order in which the states are updated, sometimes new values are used instead of old ones on the right hand side of \ref{eq: expectedupdate}. This in-place algorithm also converges to $v_\pi$ and usually faster than the two-array version, since we use new data as soon as they are available.
+\paragraph{In-place updates} To write the sequential compute program to implement iterative policy evaluation as given by update rule \ref{eq: expectedupdate}, you would naively have to use two arrays: one for the old values $v_k(s)$ and another for the new values $v_{k+1}(s)$. The length of these arrays would be equal to the number of states in the MDP. With these two arrays, the new values can be computed one by one from the old values without the old values being changed. It's instead easier to implement ``in place'', with each new value immediately overwriting the old one. Depending on the order in which the states are updated, sometimes new values are used instead of old ones on the right hand side of \ref{eq: expectedupdate}. This in-place algorithm is also guaranteed to converge to $v_\pi$ and is usually faster than the two-array version, since we use new data as soon as they are available.
 
 \begin{algorithm}
   \caption{Iterative Policy Evaluation, for estimating $v_\pi$} 
@@ -1185,7 +1185,7 @@ for all $s \in \mathcal S$. Realize that $v_k = v_\pi$ is a fixed-point for this
   \For{$s \in \mathcal S$} {
     $v \gets V(s)$\\
     $V(s) \gets \sum_a \pi(a|s) \sum_{s',r} \Pr(s', r| s, a) \left[ r + \gamma       V(s')\right]$ \\
-    $\Delta \gets \max\left(\Delta, |v - V(s)|\right)$
+    $\Delta \gets \max\left(\Delta, |v - V(s)|\right)$ \hspace{35pt} \tcp{Track largest update to state-value function.}
   }
 }
 \end{algorithm}
@@ -1223,53 +1223,53 @@ for all $s \in \mathcal S$. Realize that $v_k = v_\pi$ is a fixed-point for this
   \caption{\footnotesize The non-terminal states are $\{1, 2, \ldots, 14\}$, and there are four possible actions in each state $\mathcal A = \{\texttt{up}, \texttt{down}, \texttt{right}, \texttt{left}\}$, which deterministically cuase the corresponding state transitions, except that actions which would take the agent off the grid in fact leave the state unchanged. In the notation of $\Pr(s',r|s,a)$ we have examples like $\Pr(6,-1|5,\texttt{right}) = 1$, or $\Pr(7, -1 | 7, \texttt{right}) = 1$, as well as $\Pr(10,r|5,\texttt{right}) = 0$ for all $r \in \mathcal R$. This is an undiscounted, episodic task. The reward is $-1$ on all transitions until the terminal state is reached, which is denoted by a gray shaded region(s); although shown in two places, it is formally one state. The expected reward function is thus $r(s,a,s') = -1$ for all states $s,s'$ and actions $a$. Suppose the agent chooses the equiprobable random policy (where all actions are equally likely). The function $v_\pi$ gives for each state the negated expected number of steps from that state until termination.}
 \end{figure}
 
-\begin{figure}[h]
-  \centering
-  \begin{tikzpicture}[scale=2/3]
-    \node at (-2, 5) {$\substack{v_k \textrm{ for the } \\ \textrm{random policy}}$};
-    \node at (3, 5) {$\substack{\textrm{greedy policy} \\ \textrm{w.r.t. }         v_k}$};
-    % We first draw out all grids simultaneously, sparing values and policies %themselves.
-    \foreach \y in {0, -1.25, ..., -6.25} {
-      \draw[step=1.0,black,thin] (-4,\y*4) grid (0, \y*4+4);      
-      \draw[step=1.0,black,thin] (1,\y*4) grid (5, \y*4+4);
-      \fill[gray!50] (1, \y*4+3) rectangle (2,\y*4+4);
-      \fill[gray!50] (4, \y*4) rectangle (5,\y*4+1);
-    }
-    % For k=0.
-    \node at (-5.5, 2) {$k=0$};
-    \foreach \x in {-3.5, ..., -0.5} {
-      \foreach \y in {0.5, ..., 3.5} {
-        \node at (\x, \y) {\scriptsize 0.0};
-      }
-    }
-    \foreach \x in {-2.5, ..., -0.5} {
-      \foreach \y in {1.5, ..., 3.5} {
-        \node at (\x + 5, \y) {$\big\uparrow$};
-        \node at (\x + 5, \y) {$\big\downarrow$};
-        \node at (\x + 5, \y) {$\longleftarrow$};
-        \node at (\x + 5, \y) {$\longrightarrow$};
-      }
-    }
-    \foreach \y in {0.5, ..., 2.5} {
-      \node at (1.5, \y) {$\big\uparrow$};
-      \node at (1.5, \y) {$\big\downarrow$};
-      \node at (1.5, \y) {$\longleftarrow$};
-      \node at (1.5, \y) {$\longrightarrow$};
-    }
-    \foreach \x in {2.5, 3.5} {
-      \node at (\x, 0.5) {$\big\uparrow$};
-      \node at (\x, 0.5) {$\big\downarrow$};
-      \node at (\x, 0.5) {$\longleftarrow$};
-      \node at (\x, 0.5) {$\longrightarrow$};
-    }
-    % For k = 1.
-    \node at (-5.5,-3) {$k=1$};
-    \node at (-5.5,-8) {$k=2$};
-    \node at (-5.5,-13) {$k=3$};
-    \node at (-5.5,-18) {$k=10$};
-    \node at (-5.5,-23) {$k=\infty$};
-  \end{tikzpicture}
-\end{figure}
+% \begin{figure}[h]
+%   \centering
+%   \begin{tikzpicture}[scale=2/3]
+%     \node at (-2, 5) {$\substack{v_k \textrm{ for the } \\ \textrm{random % policy}}$};
+%     \node at (3, 5) {$\substack{\textrm{greedy policy} \\ \textrm{w.r.t. }         % v_k}$};
+%     % We first draw out all grids simultaneously, sparing values and policies % %themselves.
+%     \foreach \y in {0, -1.25, ..., -6.25} {
+%       \draw[step=1.0,black,thin] (-4,\y*4) grid (0, \y*4+4);      
+%       \draw[step=1.0,black,thin] (1,\y*4) grid (5, \y*4+4);
+%       \fill[gray!50] (1, \y*4+3) rectangle (2,\y*4+4);
+%       \fill[gray!50] (4, \y*4) rectangle (5,\y*4+1);
+%     }
+%     % For k=0.
+%     \node at (-5.5, 2) {$k=0$};
+%     \foreach \x in {-3.5, ..., -0.5} {
+%       \foreach \y in {0.5, ..., 3.5} {
+%         \node at (\x, \y) {\scriptsize 0.0};
+%       }
+%     }
+%     \foreach \x in {-2.5, ..., -0.5} {
+%       \foreach \y in {1.5, ..., 3.5} {
+%         \node at (\x + 5, \y) {$\big\uparrow$};
+%         \node at (\x + 5, \y) {$\big\downarrow$};
+%         \node at (\x + 5, \y) {$\longleftarrow$};
+%         \node at (\x + 5, \y) {$\longrightarrow$};
+%       }
+%     }
+%     \foreach \y in {0.5, ..., 2.5} {
+%       \node at (1.5, \y) {$\big\uparrow$};
+%       \node at (1.5, \y) {$\big\downarrow$};
+%       \node at (1.5, \y) {$\longleftarrow$};
+%       \node at (1.5, \y) {$\longrightarrow$};
+%     }
+%     \foreach \x in {2.5, 3.5} {
+%       \node at (\x, 0.5) {$\big\uparrow$};
+%       \node at (\x, 0.5) {$\big\downarrow$};
+%       \node at (\x, 0.5) {$\longleftarrow$};
+%       \node at (\x, 0.5) {$\longrightarrow$};
+%     }
+%     % For k = 1.
+%     \node at (-5.5,-3) {$k=1$};
+%     \node at (-5.5,-8) {$k=2$};
+%     \node at (-5.5,-13) {$k=3$};
+%     \node at (-5.5,-18) {$k=10$};
+%     \node at (-5.5,-23) {$k=\infty$};
+%   \end{tikzpicture}
+% \end{figure}
 
 \subsection{Policy Improvement}
 The reason we care to compute the value function for a policy is such that we can use it to help find better policies. Suppose we've determined the value function $v_\pi$ for an \emph{arbitrary} deterministic policy $\pi$. For some state $s$, we'd like to know whether we should change the policy to deterministically choose an action $a \neq \pi(s)$. Of course, we know how good it is to follow the current policy from $s$, i.e. $v_\pi(s)$, but would it be better or worse to switch to a new policy? Consider selecting $a$ in $s$ and thereafter following the existing policy $\pi$. The value of \emph{this} way of behaving is given by
@@ -1277,7 +1277,10 @@ The reason we care to compute the value function for a policy is such that we ca
   \label{eq: takingactionathenfollowingpolicypithereafter}
   q_\pi(s,a) \coloneqq \mathbb E \left[ R_{t+1} + \gamma v_\pi(S_{t+1}) | S_t =     s, A_t = a \right] = \sum_{s',r} \Pr(s',r | s,a) \left[ r + \gamma v_\pi(s')\right].
 \end{equation}
-We'd like to know how this quantity compares to $v_\pi(s)$. We would intuitively expect that if it is better to select $a$ once in $s$ and thereafter follow $\pi$ relative to just following $\pi$ all the time, that we could improve our policy further still by just taking action $a$ \emph{every} time we encounter $s$. It turns out this is a special case of a general result called the \emph{policy improvement theorem}. Let $\pi$ and $\pi'$ be any pair of deterministic policies such that for all $s \in \mathcal S$,
+We'd like to know how this quantity compares to $v_\pi(s)$. We would intuitively expect that if it is better to select $a$ once in $s$ and thereafter follow $\pi$ relative to just following $\pi$ all the time, that we could improve our policy further still by just taking action $a$ \emph{every} time we encounter $s$. It turns out this is a special case of a general result called the \emph{policy improvement theorem}.
+
+\subsubsection{Policy Improvement Theorem}
+Let $\pi$ and $\pi'$ be any pair of deterministic policies such that for all $s \in \mathcal S$,
 \begin{equation}
   \label{eq: policyimprovementthm}
   q_\pi(s, \pi'(s)) \geq v_\pi(s)
@@ -1304,7 +1307,7 @@ So far we've seen how, given a policy and its value function, how to easily eval
 \paragraph{Policy improvement}
 In the even that there are multiple actions attaining a maximal value, we may break ties arbitrarily. By construction, the greedy policy meets the condition of the policy improvement theorem \ref{eq: policyimprovementthm} and so we know it's at least as good as the original policy. This process of making a new policy that improves upon an original policy, by making it greedy with respect  to the value function of the original policy, is called \emph{policy   improvement}.
 
-\paragraph{Why policy improvement gives us a strictly better policy} Suppose toward contradiction that the new greedy policy $\pi'$ is as good as, but not better than, the old policy $\pi$. Then, $v_\pi = v_{\pi'}$, and from equation
+\subsubsection{Why policy improvement gives us a strictly better policy} Suppose toward contradiction that the new greedy policy $\pi'$ is as good as, but not better than, the old policy $\pi$. Then, $v_\pi = v_{\pi'}$, and from equation
 \ref{eq: greedypolicy} it follows that for all $s \in \mathcal S$:
 \[
   v_{\pi'}(s) = \max_a \mathbb E \left[R_{t+1} + \gamma v_{\pi'}(S_{t+1}) | S_t= s | A_t = a \right] = \max_a \sum_{s',r} \Pr(s',r|s,a)\left[r + \gamma v_{\pi'}(s)\right].
@@ -1313,8 +1316,9 @@ But, realize this is the same as the Bellman optimality equation! Therefore, $v_
 
 \paragraph{Stochastic optimal policies} The policy improvement theorem carries through as stated for the stochastic case where a policy $\pi$ specifies probabilities $\pi(a|s)$ for taking each action $a$ in each state $s$. If there are ties in the policy improvement steps such as \ref{eq: greedypolicy}, i.e. if there are several actions at which the maximum is achieved, then in the stochastic case we can allocate a portion of the probability of being selected in the new greedy policy to each of these maximizing actions; any portioning scheme is allowed so long as all submaximal actions are given zero probability.
 
-\subsection{Policy Iteration}
+\subsection{Policy Iteration (Control)}
 We can iteratively improve upon our policies to obtain a sequence of monotonically improving policies and value functions.
+
 \begin{figure}[h]
   \centering
   \begin{tikzpicture}
@@ -1339,14 +1343,17 @@ We can iteratively improve upon our policies to obtain a sequence of monotonical
     \draw[->] (pistar) -- (vstar);
     \node[right = 6mm of finali] {\scriptsize E};
   \end{tikzpicture}
-  \caption{\footnotesize In this figure, $\overset{\textrm{E}}{\longrightarrow}$ denotes a policy \emph{evaluation} and $\overset{\textrm{I}}{\longrightarrow}$ denotes a policy \emph{improvement}. Each policy is guaranteed to be strictly better than the last, unless it's already optimal. Because a finite MDP has only a finite number of policies, this process must converge to an optimal policy and optimal value function in a finite number of iterations.}
+  \caption{\footnotesize In this figure, $\overset{\textrm{E}}{\longrightarrow}$ denotes a policy \emph{evaluation} and $\overset{\textrm{I}}{\longrightarrow}$ denotes a policy \emph{improvement}. Each policy is deterministic, and is guaranteed to be strictly better than the last, unless it's already optimal. Because a finite MDP has only a finite number of deterministic policies, this process must converge to an optimal policy and optimal value function in a finite number of iterations.}
 \end{figure}
-This way of finding an optimal policy is known as \emph{policy iteration}. We provide a complete algorithm here.
-\begin{algorithm}
+
+This way of finding an optimal policy is known as \emph{policy iteration}. We provide a complete sequence of instructions in algorithm \ref{alg: policyimprovement}.
+Notice that in the step of Policy Evaluation, that we are using the value functions learned from our previous policy; this typically results in a large increase in the speed of convergence of our algorithm, presumably because the value function is changing slowly from one policy to the next.
+
+\begin{algorithm}[h]
   \SetKwRepeat{Do}{do}{while}
   \KwInput{$\theta$, a small positive number determining the accuracy of         estimation.}
   Initialize $V(s) \in \mathbb R$ and $\pi(s) \in \mathcal A(s)$ arbitrarily for   all $s \in \mathcal S$ \tcp{Initialization.}
-\tcp{Policy Evaluation.}
+\tcp{Policy Evaluation (make $v$ reflect $\pi$).}
 \Do{$\Delta \geq \theta$}{
   $\Delta \gets 0$ \\
   \For{$s \in \mathcal S$} {
@@ -1355,56 +1362,24 @@ This way of finding an optimal policy is known as \emph{policy iteration}. We pr
     $\Delta \gets \max\{\Delta, |v - V(s)|\}$
   }
 }
-\tcp{Policy improvement.}
+\tcp{Policy improvement (make $\pi$ greedy).}
 \texttt{policy\_stable} $\gets$ \texttt{true} \\
 \For{$s \in \mathcal S$} {
   \texttt{old\_action} $\gets \pi(s)$ \\
   $\pi(s) \gets \argmax_a \sum_{s',r} \Pr(s',r|s,a) \left[r + \gamma     V(s')\right]$ \\
-\If{\texttt{old\_action} $\neq \pi(s)$}{
+\lIf{\texttt{old\_action} $\neq \pi(s)$}{
   \texttt{policy\_stable} $\gets \texttt{false}$
 }
 }
-\If{\texttt{policy\_stable}} {
+\lIf{\texttt{policy\_stable}} {
   \Return{$V \approx v_*$ and $\pi \approx \pi_*$}
-} \Else{
+} \lElse{
   Evaluate policy, going back to second step in our algorithm.
 }
-\caption{Policy Iteration (using iterative policy evaluation) for estimating $\pi \approx \pi_*$. Note that this algorithm can oscillate between two equally good policies, and so in practice we should keep track of whether our value function is changing (i.e. still improving) in addition to checking for \texttt{policy\_stable}.}
+\caption{\footnotesize Policy Iteration (using iterative policy evaluation) for estimating $\pi \approx \pi_*$. Note that this algorithm can oscillate between two equally good policies, and so in practice we should keep track of whether our value function is changing (i.e. still improving) in addition to checking for \texttt{policy\_stable}.}
+\label{alg: policyimprovement}
 \end{algorithm}
-Notice that in the step of Policy Evaluation, that we are using the value functions learned from our previous policy; it turns out this typically results in a large increase in the speed of convergence of our algorithm, presumably because the value function is changing slowly from one policy to the next.
-\subsection{Value Iteration}
 
-A downside to policy iteration is that each of its iterations involves policy evaluation, which may itself be an iterative computation involving multiple sweeps through the state set. If policy evaluation is done iteratively, it is only in the limit that we get convergence to $v_\pi$. The policy evaluation step of policy iteration can be truncated in several ways without losing the convergence guarantees of policy iteration! One important case is when the algorithm is stopped after just one sweep (or one update of each state). This algorithm is known as \emph{value iteration}. It can be written as a particularly simple update operation that combines the policy improvement and truncated policy evaluation steps:
-
-\begin{equation}
-  v_{k+1} \coloneqq \max_a \mathbb E \left[ R_{t+1} + \gamma v_k(S_{t+1}) | S_t = s , A_t = a \right] = \max_a \sum_{s',r} \Pr(s',r|s,a) \left[ r + \gamma v_k(s')\right],
-\end{equation}
-
-for all $s \in \mathcal S$. For any arbitrary $v_0$, the sequence $\{v_k\}$ can be shown to converge to $v_*$ under the same conditions that guarantee the existence of $v_*$. Realize that value iteration is obtained simply by turning the Bellman optimality equation into an update rule. Also, note that the value iteration update is identical to the policy evaluation update \ref{eq:     expectedupdate} except it requires the maximum to be taken over all actions.
-
-\paragraph{How does value iteration terminate?} Like policy evaluation, value iteration formally requires an infinite number of iterations to converge exactly to $v_*$. In practice, we stop once the value function changes by only a small amount in a sweep.
-\begin{algorithm}
-  \SetKwRepeat{Do}{do}{while}
-  \KwInput{A small threshold $\theta > 0$ determining accuracy of estimation}
-  Initialize $V(s)$, for all $s \in \mathcal S^+$, arbitrarily except that   $V(\textrm{terminal}) = 0$. \\
-\Do{$\Delta < \theta$} {
-  $\Delta \gets 0$ \\
-  \For{$s \in \mathcal S$} {
-    $v \gets V(s)$ \\
-    $V(s) \gets \max_a \sum_{s',r} \Pr(s',r|s,a)\left[r+\gamma V(s')\right]$ \\
-    $\Delta \gets \max\{\Delta, |v-V(s)|\}$
-  }
-}
-Output a deterministic policy, $\pi \approx \pi_*$, such that
-\[
-  \pi(s) = \argmax_a \sum_{s',r} \Pr(s',r|s,a) \left[ r + \gamma V(s')\right].
-\]
-\caption{Value iteration, for estimating $\pi \approx \pi_*$}
-\end{algorithm}
-Value iteration effectively combines, each each of its sweeps, one sweep of policy evaluation and one sweep of policy improvement.
-
-\subsection{Generalized Policy Iteration}
-Policy iteration consists of two simultaneous, interacting processes: one making the value function consistent with the current policy (policy evaluation), and the other making the policy greedy with respect to the current value function (policy improvement). In policy iteration, these two processes alternate, but this isn't necessary as wel saw in value iteration only a single iteration of policy evaluation is performed in between each policy improvement.  As long as both processes continue to update all states, the ultimate result is typically the same - convergence to the optimal value function and an optimal policy.
 \begin{figure}[h]
   \centering
   \begin{tikzpicture}
@@ -1424,15 +1399,13 @@ Policy iteration consists of two simultaneous, interacting processes: one making
   \end{tikzpicture}
   \caption{\footnotesize We use the term \emph{generalized policy iteration} (GPI) to refer to the general idea of letting policy evaluation and policy improvement processes interact, independent of the granularity and other details of the two processes. Almost all RL learning methods can be described as GPI: i.e. all have identifiable policies and value functions, with the policy always being improved with respect to the value function and the value function always being driven toward the value function for the policy, as suggested in our diagram. If both the evaluation process and improvement process stabilize, then the value function and policy must be optimal: the value function only stabilizes when it is consistent with the current policy, and the policy stabilizes only when it is greedy with respect to the current value function. Thus, both processes stabilize only when a policy has been found that is greedy with respect to its own evaluation function. This implies the Bellman optimality equation holds and thus that the policy and value function are optimal!}
 \end{figure}
-\paragraph{Evaluation and Improvement as both competing and cooperating processes}
-The evaluation and improvement processes in GPI are both competing and cooperating processes. They compete in the sense that making the policy greedy with respect to the value function typically makes the value function incorrect for the changed policy, and making the value function consistent with the policy typically causes the policy no longer to be greedy. In the long run, however, these two processes interact to find a single joint solution: the optimal value function and an optimal policy.
 
 \begin{figure}[h]
   \centering
-  \begin{tikzpicture}
+  \begin{tikzpicture}[scale=3/4]
     \draw (-4, 2) -- (0, 0) node[above left = 3mm, rotate = -28] {$v = v_\pi$};  % y = -1/2x
     \draw (-3.5,-1.16666) -- (0, 0) node[below left, rotate=20] {$\pi =       \textrm{greedy}(v)$}; % y= 1/3*x
-    \node at (0.5, 0) {$v_*, \pi_*$};
+    \node at (0.75, 0) {$v_*, \pi_*$};
     \node[draw,circle,fill,scale=1/4,blue!50] (init) at (-4, 0.25) {};
     \node[below = 1mm of init] {$\scriptstyle v,\pi$};
     \node[draw,circle,fill,scale=1/4,blue!50] (one)  at (-3.5, 1.75) {};
@@ -1450,9 +1423,62 @@ The evaluation and improvement processes in GPI are both competing and cooperati
   \end{tikzpicture}
   \caption{\footnotesize We can think of the nteraction between the evaluation and improvement processes in GPI in terms of two constraints or goals -- for example as two lines in two-dimensional space as suggested by the diagram. Although the real geometry is much more complicated, the diagram suggests what happens in the real case. Each process drives the value function or policy toward one of the lines representing a solution to one of the two goals. The goals \emph{interact} because the lines are not orthogonal: driving directly toward one goal causes some movement away from the other goal; inevitably, however, the joint process is brought closer to the overall goal of optimality. The arrows in the diagram correspond to the behavior of policy iteration in that each takes the system all the way to achieving one of the two goals completely. In GPI, one could also take smaller, incomplete steps toward each goal. In either case, the two processes together achieve the overall goal of optimality even though neither is attempting to achieve it directly!}
 \end{figure}
+\subsection{Value Iteration}
+A downside to policy iteration is that each of its iterations involves policy evaluation, which may itself be an iterative computation involving multiple sweeps through the state set. If policy evaluation is done iteratively, it is only in the limit that we get convergence to $v_\pi$. The policy evaluation step of policy iteration can be truncated in several ways without losing the convergence guarantees of policy iteration! One important case is when the algorithm is stopped after just one sweep (or one update of each state). This algorithm is known as \emph{value iteration}. It can be written as a particularly simple update operation that combines the policy improvement and truncated policy evaluation steps:
+
+\begin{equation}
+  v_{k+1} \coloneqq \max_a \mathbb E \left[ R_{t+1} + \gamma v_k(S_{t+1}) | S_t = s , A_t = a \right] = \max_a \sum_{s',r} \Pr(s',r|s,a) \left[ r + \gamma v_k(s')\right],
+\end{equation}
+
+for all $s \in \mathcal S$. For any arbitrary $v_0$, the sequence $\{v_k\}$ can be shown to converge to $v_*$ under the same conditions that guarantee the existence of $v_*$. Realize that value iteration is obtained simply by turning the Bellman optimality equation into an update rule. Also, note that the value iteration update is identical to the policy evaluation update \ref{eq:     expectedupdate} except it requires the maximum to be taken over all actions.
+
+\paragraph{How does value iteration terminate?} Like policy evaluation, value iteration formally requires an infinite number of iterations to converge exactly to $v_*$. In practice, we stop once the value function changes by only a small amount in a sweep.
+
+\begin{algorithm}[h]
+  \SetKwRepeat{Do}{do}{while}
+  \KwInput{A small threshold $\theta > 0$ determining accuracy of estimation}
+  Initialize $V(s)$, for all $s \in \mathcal S^+$, arbitrarily except that   $V(\textrm{terminal}) = 0$. \\
+\Do{$\Delta < \theta$} {
+  $\Delta \gets 0$ \\
+  \For{$s \in \mathcal S$} {
+    $v \gets V(s)$ \\
+    \tcp{\footnotesize In the next step, we don't refer to any policy, hence name value iteration}
+    $V(s) \gets \max_a \sum_{s',r} \Pr(s',r|s,a)\left[r+\gamma V(s')\right]$ \\    $\Delta \gets \max\{\Delta, |v-V(s)|\}$
+  }
+}
+Output a deterministic policy, $\pi \approx \pi_*$, such that
+\[
+  \pi(s) = \argmax_a \sum_{s',r} \Pr(s',r|s,a) \left[ r + \gamma V(s')\right].
+\]
+\caption{Value iteration, for estimating $\pi \approx \pi_*$}
+\end{algorithm}
+
+Value iteration effectively combines, each each of its sweeps, one sweep of policy evaluation and one sweep of policy improvement.
+
+\paragraph{Asynchronous DP}
+Methods that perform systematic sweeps like this are called synchronous; this can be problematic if the state space is large since the sweeps can take a long time. Asynchronous DP is a family of methods in which we update the states in any order; in fact, multiple updates may be performed to a single state before another state is updated once. In order to guarantee convergence, asynchronous algorithms must update the values of all states.
+
+\subsection{Generalized Policy Iteration}
+Policy iteration consists of two simultaneous, interacting processes: one making the value function consistent with the current policy (policy evaluation), and the other making the policy greedy with respect to the current value function (policy improvement). In policy iteration, these two processes alternate, but this isn't necessary as we saw in value iteration only a single iteration of policy evaluation is performed in between each policy improvement.  As long as both processes continue to update all states, the ultimate result is typically the same - convergence to the optimal value function and an optimal policy.
+
+\paragraph{Evaluation and Improvement as both competing and cooperating processes}
+The evaluation and improvement processes in GPI are both competing and cooperating processes. They compete in the sense that making the policy greedy with respect to the value function typically makes the value function incorrect for the changed policy, and making the value function consistent with the policy typically causes the policy no longer to be greedy. In the long run, however, these two processes interact to find a single joint solution: the optimal value function and an optimal policy.
 
 \subsection{Efficiency of Dynamic Programming}
 For very large problems, DP is not practical. But, compared with other methods for solving MDPs, DP methods are actually quite efficient. The worst case work required by DP methods to find an optimal policy is polynomial in the number of states and actions. If $n$ and $k$ denote the number of states and actions, this means that a DP method takes a number of computational operations that is less than some polynomial function of $n$ and $k$. Note that we find an optimal policy in polynomial time even tohugh the total number of (deterministic) policies is $k^n$; in this sense, DP is exponentially faster than any direct search in policy space could be. DP is sometimes thought to be of limited applicability because of the \emph{curse of dimensionality}, the fact that the number of states often grows exponentially with the number of state variables. Although it's true that large state sets create difficulties, these are inherent difficulties in the problem not of DP as a solution method. DP is in fact comparatively better suited to handling large state spaces than competing methods such as direct search and linear programming.
+
+\subsubsection{Monte Carlo sampling as an alternative method for learning a     value function}
+The value of each state can be treated as a totally independent estimation problem. First, recall that the value of a state is given by the expected reward starting from that state when acting under a particular policy, i.e.
+\[
+  v_\pi(s) \coloneqq \mathbb E_\pi\left[G_t | S_t = s \right].
+\]
+First, let's gather a large number of returns under $\pi$ and then take their average for each state; this method is called the Monte Carlo method. However, if we do it this way we may need a large number of returns from each state. To see this, realize that each return depends on many random actions, selected by $\pi$, as well as many random state transitions due to the dynamics of the MDP. We could be dealing with a lot of randomness here, and so each return might be very different than the true state value. So, we may need to average many returns before the estimate converges, and we have to do this for every single state. 
+
+\paragraph{DP bootstraps value estimates from successor states to improve current value estimate} 
+The key insight to DP is that we don't have to treat the evaluation of each state as a separate problem: we can use the other value estimates that we've worked hard to compute. The process of using the value estimates of successor states to improve our current value estimate is known as \emph{bootstrapping}. This can be much more efficient than a Monte-Carlo method which estimates each value independently.
+
+\subsubsection{Brute-force search as an alternative method for finding an   optimal policy}
+Here, we simply evaluate every possible deterministic policy one at a time. We then select the one with the highest value. Since there are a finite number of deterministic policies, there always exists an optimal deterministic policy. So, brute-force search will find the answer eventually. However, the number of deterministic policies can be huge. Because a deterministic policy consists of one action choice per state, the total number of deterministic policies is exponential in the number of states; i.e. there are $|\mathcal S|$ states, and for each we have to consider from $|\mathcal A|$ different actions, this leads to multiplying $|\mathcal A|$ by itself $|\mathcal S|$ times: $|\mathcal A|^{|\mathcal S|}$. On the other hand, the policy improvement theorem guarantees that policy iteration will find a sequence of better and better policies: this is a significant improvement over exhaustively searching each and every policy. 
 
 \subsection{Summary}
 
