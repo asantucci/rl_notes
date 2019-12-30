@@ -1523,9 +1523,120 @@ Recall that the value of a state is the expected return -- expected cumulative f
 \end{algorithm}
 Both first-visit and every-visit MC converge to $v_\pi(s)$ as the number of visits (or first visits) to $s$ goes to $\infty$. It's particularly easy to see in the case of first-visit MC: each return is an independent, identically distributed estimate of $v_\pi(s)$ with finite variance; by weak law of large numbers the sequence of averages of these estimates converges to their true expected value; each average itself is an unbiased estimate and the standard deviation of its error decreases like $\frac{1}{\sqrt n}$, where $n$ is the number of returns averaged.
 
-\paragraph{Blackjack Example} The goal is to obtain cards the sum of whose numerical values is as great as possible without exceeding 21. All face cards count as 10, an ace can count as either 1 or 11. We consider a game where we only play against the dealer. The game starts with two cards dealt to both dealer and player. \emph{One of the dealer's cards is face up and the other is face down.} If the player has 21 immediately (an ace and a 10-card), then it is called a natural and he/she wins unless the dealer also has a natural in which case we pronounce a draw. If the player doesn't have a natural, he/she can either request an additional card (hit), stop requesting cards (stick), or go bust (if the value of cards exceeds 21). If he/she goes bust, the agent loses. If the agent sticks, it becomes the dealer's turn. The dealer hits or sticks according to a fixed strategy: stick on any sum 17 or greater, and hits otherwise. If the dealer goes bust the agent wins; otherwise, the outcome is determined by whosever final sum is closer to 21. This problem is naturally formulated as an episodic MDP, where each game is an episode. Rewards of +1, -1, and 0 are given for winning, losing, and drawing respectively; all rewards within a game are zero, and we don't discount. Whence, the terminal rewards are also the returns. The agent's \emph{actions} are to hit or to stick. The states depend on the player's cards and the dealer's showing card. We assume the cards are dealt from an infinite deck (i.e. with replacement) so that there is no advantage to keeping track of which cards are already dealt. If the player holds an ace that he/she could count as 11 without going bust, then the ace is said to be \emph{useable}. In this case, it is always counted as 11, because counting it as a 1 would make the sum 11 or less, in which case there is no decision to be made because obviously the player should always hit (since in this case a hit is impossible to cause a bust, since the max valued card is 10 ignoring aces which can be treated as ones). Thus, the player makes their decision based on three variables: their current sum (12-21), the dealer's one showing card (ace-10), and whether or not he/she holds a useable ace. This makes for a total of 200 states. We consider the policy that sticks if the player's sum is 20 or 21, and otherwise hits. To find the state-value function for this policy by a Monte Carlo approach, we simulate many blackjack games using the policy and average the returns following each state. 
+\paragraph{Blackjack Example} The goal is to obtain cards the sum of whose numerical values is as great as possible without exceeding 21. All face cards count as 10, an ace can count as either 1 or 11. We consider a game where we only play against the dealer. The game starts with two cards dealt to both dealer and player. \emph{One of the dealer's cards is face up and the other is face down.} If the player has 21 immediately (an ace and a 10-card), then it is called a natural and he/she wins unless the dealer also has a natural in which case we pronounce a draw. If the player doesn't have a natural, he/she can either request an additional card (hit), stop requesting cards (stick), or go bust (if the value of cards exceeds 21). If he/she goes bust, the agent loses. If the agent sticks, it becomes the dealer's turn. The dealer hits or sticks according to a fixed strategy: stick on any sum 17 or greater, and hits otherwise. If the dealer goes bust the agent wins; otherwise, the outcome is determined by whosever final sum is closer to 21. This problem is naturally formulated as an episodic MDP, where each game is an episode. Rewards of +1, -1, and 0 are given for winning, losing, and drawing respectively; all rewards within a game are zero, and we don't discount. Whence, the terminal rewards are also the returns. The agent's \emph{actions} are to hit or to stick. The states depend on the player's cards and the dealer's showing card. We assume the cards are dealt from an infinite deck (i.e. with replacement) so that there is no advantage to keeping track of which cards are already dealt. If the player holds an ace that he/she could count as 11 without going bust, then the ace is said to be \emph{useable}. In this case, it is always counted as 11, because counting it as a 1 would make the sum 11 or less, in which case there is no decision to be made because obviously the player should always hit (since in this case a hit is impossible to cause a bust, since the max valued card is 10 ignoring aces which can be treated as ones). Thus, the player makes their decision based on three variables: their current sum (12-21), the dealer's one showing card (ace-10), and whether or not he/she holds a useable ace. This makes for a total of 200 states. We consider the policy that sticks if the player's sum is 20 or 21, and otherwise hits. To find the state-value function for this policy by a Monte Carlo approach, we simulate many blackjack games using the policy and average the returns following each state.
+
+\paragraph{Comparing why DP not suitable for task of blackjack} Although we have complete knowledge of the environment in the blackjack task, it wouldn't be easy to apply DP methods to compute the value function. DP methods requrie the distribution of next events -- in particular, they require the environments dynamics as given by the four-argument function $\Pr(s', r | s, a)$ -- and it is not easy to determine this for blackjack. E.g. suppose the player's sum is 14 and they choose to stick. What is the probability of the agent terminating with a reward of $+1$ as a function of the dealer's showing card? All of the probabilities must be computed \emph{before} DP can be applied, and these computations are complex and error-prone for this example. In contrast, generating the sample games required by MC methods is easy, and this is the case surprisingly often.
+
+\paragraph{Backup diagrams and Monte Carlo algorithms} The general idea of a backup diagram is to show at the top the root node to be updated and to show below all the transitions and leaf nodes whose rewards and estimated values contribute to the update. For Monte Carlo evaluation of $v_\pi$, the root is a state node, and below it is an entire trajectory of transitions along a particular single episode, ending at the terminal state.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[scale=1/2]
+    \node[draw,circle,scale = 1/2] (root) at (0, 0) {};
+    \node[draw,circle,fill,scale=1/3] (a1) at (0, -1) {};
+    \node[draw,circle,scale = 1/2] (s1) at (0, -2) {};
+    \node[draw,circle,fill,scale=1/3] (a2) at (0, -3) {};
+    \node (dots) at (0,-4) {$\vdots$};
+    \node[draw,circle,fill,scale=1/3] (an) at (0,-5) {};
+    \node[draw,rectangle,fill,gray!50,scale=1/2] (sn) at (0,-6) {};
+    \draw[->] (root) -- (a1);
+    \draw[->] (a1) -- (s1);
+    \draw[->] (s1) -- (a2);
+    \draw[->] (an) -- (sn);
+  \end{tikzpicture}
+\end{figure}
+
+Whereas the DP diagram shows all possible transitions, the Monte Carlo diagram shows only those sampled on the one episode. Whereas the DP diagram includes only one-step transitions, the Monte Carlo diagram goes all the way to the end of the episode. These differences in the diagrams accurately reflect the fundamental differences between the algorithms.
+
+\paragraph{Monte Carlo methods imply estimates for each state are independent} The estimate for one state does not depend or build upon the estimate of any other state, as in the sense of DP. In other words, Monte Carlo methods do not \emph{bootstrap} as defined previously.
+
+\paragraph{Computational expense of estimating the value of a single state is independent of the number of states} This can make Monte Carlo methods particularly attractice when one requires the value of only one or a subset of states. One can generate many sample episodes starting from the states of interest, averaging returns from only these states, ignoring all others. This is a third advantage of Monte Carlo methods can have over DP method, after the ability to learn from (simulated) experience.
+
 \subsubsection{Monte Carlo Estimation of Action Values}
+If a model is not available, then it is particularly useful to estimate \emph{action} values (the value of state-action pairs) rather than \emph{state} values. With a model, state values alone are sufficient to determine a policy: one simply looks one step ahead and chooses whichever action leads to the best combination of reward and next state. Without a model, however, state values alone are not sufficient: one must explicitly estimate the value of each action in order for the values to be useful in suggesting a policy. Thus, a primary goal for Monte Carlo methods is to estimate $q_*$. To achieve this, we consider the policy evaluation problem for action values.
+
+\paragraph{Policy evaluation problem for action values} The problem is to estimate $q_\pi(s,a)$, the expected return when starting in state $s$, taking action $a$, and thereafter following policy $\pi$. The Monte Carlo methods for this are essentially the same as just presented for state values, except now we talk about visits to a state-action pair rather than to a state. A state-action pair $s,a$ is said to be visited in an episode if ever the state $s$ is visited and action $a$ is taken in it. The every-visit MC method estimates the value of a state-action pair as the average of the returns that have followed all the visits to it, whereas the first-visit MC method averages the returns following the first time in each episode that the state was visited and the action was selected. These method both converge to the true expected values as the number of visits to each state-action pair approaches infinity.
+
+\paragraph{The general problem of maintaining exploration} There is a complication in that many state-action pairs may never be visited. If $\pi$ is a deterministic policy, then in following $\pi$ one will observe returns only for one of the actions from each state. With no returns to average, the Monte Carlo estimates of the other actions will not improve with experience. This is problematic because the purpose of learning action values is to help in choosing among the actions available in each state. To compare alternatives, we need to estimate the value of \emph{all} the actions from each state, not just the one we currently favor. This is the problem of \emph{maintaining exploration}.
+
+\paragraph{The method of exploring starts}
+For policy evaluation to work for action values, we must assure continual exploration. One way to do this is by specifying that the episodes \emph{start in a state-action pair}, and that every pair has a nonzero probability of being selected as the start. This guarantees that all state-action pairs will be visited an infinite number of times in the limit of an infinite number of episodes. This strategy is known as \emph{exploring starts}. Although this method is sometimes useful, it cannot be relied upon in general, particularly when learning directly from actual interaction with an environment. In that case, the starting conditions are unlikely to be so helpful. The most common alternative approach to assuring that all state-action pairs are encountered is to consider only policies that are stochastic with a nonzero probability of selecting all actions in each state.
 \subsubsection{Monte Carlo Control}
+We can now consider how MC estimation can be used in control, i.e. to approximate better policies. The overall idea is to proceed according to the idea of generalized policy iteration; we will maintain both an approximate policy and an approximate value function. The value function is repeatedly altered to more closely approximate the value function for the current policy, and the policy is repeatedly improved with respect to the current value function. Although the two changes work against each other to some extent, as each creates a moving target for the other, they cause both policy and value function to approach optimality.
+
+\paragraph{Monte Carlo version of classical policy iteration} In this method, we perform alternating complete steps of policy evaluation and policy improvement, beginning with an arbitrary policy $\pi_0$ and ending with the optimal policy and optimal action-value function.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \foreach \x in {0, 1, 2} {
+      \node (p\x) at (\x * 3, 0) {$\pi_\x$};
+      \node (e\x) at (\x * 3 + 0.65, 0.35) {\scriptsize E};
+    }
+    \foreach \x in {0, 1} {
+      \node (v\x) at (\x * 3 + 1.5, 0) {$q_{\pi_\x}$};
+      \draw[->] (p\x) -- (v\x);
+    }
+    \draw[->] (v0) -- (p1);
+    \draw[->] (v1) -- (p2);
+    \node at (2.25, 0.35) {\scriptsize I};
+    \node at (5.25, 0.35) {\scriptsize I};
+    \node (dots) at (3*2 + 1.5,  0) {$\ldots$};
+    \draw[->] (p2) -- (dots);
+    \node[right = 4mm of dots] (pistar) {$\pi_*$};
+    \draw[->] (dots) -- (pistar);
+    \node[right = 9.6mm of e2] (finali) {\scriptsize I};
+    \node[right = 4mm of pistar] (vstar) {$q_*$};
+    \draw[->] (pistar) -- (vstar);
+    \node[right = 6mm of finali] {\scriptsize E};
+  \end{tikzpicture}
+  \caption{\footnotesize In this figure, $\overset{\textrm{E}}{\longrightarrow}$ denotes a complete policy \emph{evaluation} and $\overset{\textrm{I}}{\longrightarrow}$ denotes a complete policy \emph{improvement}.}
+\end{figure}
+
+For the moment, we assume that we do indeed observe an infinite number of episodes and additionally that the episodes are generated with exploring starts. Under these assumptions the Monte Carlo methods will compute each $q_{\pi_k}$ exactly, for arbitrary $\pi_k$.
+
+\paragraph{Policy Improvement} Policy improvement is done by making the policy greedy with respect to the current value function. In this case we have an \emph{action}-value function, and therefore no model is needed to construct the greedy policy. For any action-value function $q$, the corresponding greedy policy is the one that, for each $s \in \mathcal S$, deterministically chooses an action with maximal action-value, i.e.
+\[
+  \pi(s) \coloneqq \argmax_a q(s,a).
+\]
+Policy improvement then can be done by constructing each $\pi_{k+1}$ as the greedy policy with respect to $q_{\pi_k}$.
+The policy improvement theorem then applies to $\pi_k$ and $\pi_{k+1}$ because for all $s \in \mathcal S$:
+\[
+  q_{\pi_k}(s, \pi_{k+1}(s)) = q_{\pi_k}(s, \argmax_a q_{\pi_k}(s,a)) = \max_a q_{\pi_k} (s,a) \geq q_{\pi_k}(s, \pi_k(s)) \geq v_{\pi_k}(s).
+\]
+Whence our policy improvement assures us that eacy $\pi_{k+1}$ is uniformly better than $\pi_k$, or just as good as it, in which case they are both optimal policies. This ensures that the overall process converges to the optimal policy and optimal value function; in this way Monte Carlo methods can be used to find optimal policies given only sample episodes and no other knowledge of the environment's dynamics.
+
+\paragraph{Removing the assumption that policy evaluation operates on an infinite number of episodes} There are two approaches. One is to hold firm to the idea of approximating $q_{\pi_k}$ in each policy evaluation; measurements and assumptions are made to obtain bounds on the magnitude and probability of error in the estimates, and then sufficient steps are taken during each policy evaluation to ensure that these bounds are sufficiently small. Although this approach can guarantee convergence, it doesn't do so fast enough. The second approach is to give up trying to complete policy evaluation before returning to policy improvement; on each evaluation step we move the value function \emph{toward} $q_{\pi_k}$, but we don't expect to get close except over many steps.\footnote{One extreme form of this idea is value iteration, in which only one iteration of iterative policy evaluation is performed before each step of policy improvement. The in-place version of value iteration is even more extreme in that we alternate between improvement and evaluation steps for single states.} For Monte Carlo policy iteration it is natural to alternate between evaluation and improvement on an episode-by-episode basis. After each episode, the observed returns are used for policy evaluation, and then the policy is improved at all the states \emph{visited} in the episode.
+
+\begin{algorithm}[h]
+  \caption{Monte Carlo Exploring Starts, for estimating $\pi \approx \pi_*$}
+  \tcp{Initialize.}
+  $\pi(s) \in \mathcal A(s)$ (arbitrarily), for all $s \in \mathcal S$ \\
+  $Q(s,a) \in \mathbb R$ (arbitrarily), for all $s in \mathcal S, a \in \mathcal   A(s)$ \\
+  $\texttt{Returns}(s,a) \gets$ empty list, for all $s in \mathcal S, a \in   \mathcal   A(s)$ \\
+\For{each episode (without termination)} {
+  Choose $S_0 \in \mathcal S$, $A_0 \in \mathcal A(S_0)$ randomly such that all   pairs have probability $>0$. \\
+  Generate an episode from $S_0, A_0$ following $\pi$: $S_0, A_0, R_1, \ldots,   S_{T-1}, A_{T-1}, R_T$.\\
+  $G \gets 0$. \\
+  \For{each step of the episode $t = T-1, T-2, \ldots, 0$} {
+    $G \gets \gamma G + R_{t+1}$ \\
+    \If{$S_t, A_t$ does not appear in $S_0, A_0, S_1, A_1, \ldots, S_{t-1},             A_{t-1}$} {
+Append $G$ to $\texttt{Returns}(S_t, A_t)$ \\
+$Q(S_t, A_t) \gets \texttt{average}(\texttt{Returns}(S_t, A_t))$ \\
+$\pi(S_t) \gets \argmax_a Q(S_t, a)$
+    }
+  }
+}
+\label{alg: montecarloes}
+\end{algorithm}
+Note that the pseudocode in algorithm \ref{alg: montecarloes} is inefficient because it maintains a listing of all returns for each state-action pair and repeatedly calculates their mean; it would be more efficient to maintain just the running average and a count (for each state-action pair) and update them incrementally.
+
+\paragraph{Convergence of Monte Carlo with Exploring Starts}
+Suppose toward contradiction that our algorithm converges to a suboptimal policy. Realize that the value function would eventually converge to the value function for that policy, and that in turn would cause the policy to change. Stability is achieved only when both the policy and the value function are optimal.
+
+\paragraph{Solving Blackjack using Monte Carlo with Exploring Starts} Because all episodes are simulated games, we can arrange for exploring starts that include all possibilities. We simply pick the dealer's cards, the payer's sum, and whether or not the player has a usable ace, all at random and with equal probabilty. As the initial policy, we can arbitrarily use the policy that sticks only on 20 or 21. The initial action-value function can be zero for all state-action pairs. 
+
 \subsubsection{Monte Carlo Control without exploring starts}
+
+
 \subsubsection{Off-policy Prediction via Importance Sampling}
 \end{document}
