@@ -1702,5 +1702,67 @@ Effectively, this shows that policy iteration works for $\epsilon$-soft policies
 we have removed the assumption of exploring starts.
 
 \subsubsection{Off-policy Prediction via Importance Sampling}
+\paragraph{Target and Behavior policies} All learning control methods face a dilemma in that they wish to learn action-values condtional on subsequent \emph{optimal} behavior, but in order to explore all actions and find which are optimal they need to behave non-optimally. How can we learn an optimal policy whilst still behaving according to an exploratory policy? On-policy approaches are one method -- they learn action values not for the optimal policy but for a near-optimal policy that still explores. An arguably more straightforward approach would be to use two policies: one that is learned and becomes the optimal policy, i.e. the \emph{target policy}, and another that is more exploratory used to generate behavior, i.e. the \emph{behavior policy}. In this case we say that learning is from data ``off'' the target policy, and the overall process is coined \emph{off-policy learning}.
 
+\paragraph{Comparison of on-policy vs. off-policy methods}
+Although off-policy learning is arguably the key to learning multi-step predictive models of the world's dynamics, they don't come for free.
+\begin{itemize}
+  \item On-policy methods are generally simpler, whereas off-policy methods     require additional concepts and notation.
+\item Off-policy methods are often of greater variance and slower to converge, but at the same time they are more powerful and general; they include on-policy methods as a special case in which the target and behavior policies are the same.
+\end{itemize}
+
+\paragraph{The prediction problem} Here, both target and behavior policies are considered fixed and given, and our goal is to estimate one of $v_\pi$ or $q_\pi$ for our target policy $\pi$. Unfortunately, all we have are episodes following another policy $b$, where $b \neq \pi$; in this case $\pi$ is the target policy and $b$ is the behavior policy.
+
+\paragraph{The assumption of \emph{coverage}}
+In order to use episodes from $b$ to estimate values for $\pi$, we \emph{require} that every action taken under $\pi$ is also taken, at least occassionally, under $b$; i.e. we require that $\pi(a|s) > 0 \implies b(a|s) > 0$, often referred to as the assumption of \emph{coverage}. It follows that $b$ must be stochastic in states where it is not identical to $\pi$. On the other hand, the target policy $\pi$ could be deterministic, e.g. a deterministic greedy policy with respect to the current estimate of the action-value function. The target policy becomes a deterministic optimal policy while the behavior policy remains stochastic and more exploratory, for example, an $\epsilon$-greedy policy.
+
+\paragraph{Importance sampling as a way of estimating expected values under target distribution given observations drawn from behavior policy} Off-policy methods utilizie \emph{importance sampling} in order to estimate expected values under the target distribution given samples where our agent acts according to the behavior policy. The strategy is to weight returns according to their relative probability of their trajectories occurring under the target and behavior policies using an \emph{importance-sampling ratio}. Given a starting state $S_t$, the probability of the subsequent state-action trajectory $A_t, S_{t+1}, A_{t+1}, \ldots, S_T$, occurring under any policy $\pi$ is
+\begin{align*}
+  \Pr(\{A_t, S_{t+1}, A_{t+1}, \ldots, S_T | S_t, A_{t:T-1} \sim \pi\} &= \pi(A_t|S_t) \Pr(S_{t+1} | S_t, A_t) \pi(A_{t+1} | S_{t+1}) \Pr(S_T | S_{T-1},                                                                          A_{T-1}) \\
+  &= \prod_{k=t}^{T-1} \pi(A_k | S_k) \Pr(S_{k+1} | S_k , A_k),
+\end{align*}
+where our probabilities are the state-transition probabilities, i.e. $\Pr(s' | s, a) \coloneqq \Pr(S_t = s' | S_{t-1} = s, A_{t-1} = a) = \sum_{r \in \mathcal R} \Pr(s', r | s, a)$. The relative probability of the trajectory under the target and behavior policies (i.e. the importance sampling ratio) is
+\[
+  \rho_{t:T-1} \coloneqq \frac{\prod_{k=t}^{T-1} \pi(A_k |S_k) \Pr(S_{k+1} | S_k, A_k)}{\prod_{k=t}^{T-1} b(A_k|S_k) \Pr(S_{k+1} | S_k, A_k)} = \prod_{k=t}^{T-1} \frac{\pi(A_k|S_k)}{b(A_k | S_k)}.
+\]
+In moving to the last equality, there was a cancellation of terms; this is critical as these trajectory probabilities depend on the MDP transition probabilities which are generally unknown. Whence, this last equality shows us that the importance sampling ratio depends only on the two policies and the sequence, not on the MDP. Recall that we wish to estimate the expected returns (values) under the target policy, but we only have access to returns $G_t$ due to the behavior policy. These returns have the wrong expectation, namely $\mathbb E \left[ G_t | S_t = s \right] = v_b(s)$ and cannot be averaged to obtain $v_\pi$. Instead, we will use importance sampling, where the ratio $\rho_{t:T-1}$ transforms the returns to have the right expected value,
+\begin{equation}
+  \mathbb E \left[ \rho_{t:T-1} G_t | S_t = s \right] = v_\pi(s).
+\end{equation}
+\paragraph{Monte Carlo algorithm for Importance Sampling}
+It is at this point that we are ready to provide our Monte Carlo algorithm for averaging returns from of observed episodes following policy $b$ to estimate $v_\pi(s)$. It will be convenient to define time steps in a way that increases across episode boundaries, e.g. if the first episode ends in a terminal state at time $t=100$, then the next episode is said to begin at time $t=101$; in this way, we can refer to particular steps in particular episodes. For an every-visit method, define
+the \emph{set} of all time steps in which state $s$ is visited by $\mathcal T(s)$, whereas for a first-vsit method $\mathcal T(s)$ would only include time steps that were first visits to $s$ within their episodes. Further, denote by $T(t)$ the first time of termination following time $t$, and $G_t$ the return after $t$ up through $T(t)$. Then $\{G_t\}_{t \in \mathcal T(s)}$ are the returns that pertain to state $s$, and $\{\rho_{t:T-1}\}_{t \in \mathcal T(s)}$ are the corresponding importance-sampling ratios. To estimate $v_\pi(s)$, we simply scale the returns by the ratios and then average the results
+\begin{equation}
+  \label{eq: ordinaryimportancesamplingstatevaluestimation}
+  V(s) \coloneqq \frac{\sum_{t \in \mathcal T(s)} \rho_{t:T(t)-1} G_t}{|\mathcal T(s)|}.
+\end{equation}
+When importance sampling is done as a simple-average in this way we call it \emph{ordinary importance sampling}. An alternative is \emph{weighted} importance sampling, which uses a weighted average defined as
+\begin{equation}
+  V(s) \coloneqq \frac{\sum_{t \in \mathcal T(s)} \rho_{t:T(t)-1} G_t}{\sum_{t \in \mathcal T(s)} \rho_{t:T(t)-1}},
+\end{equation}
+which we define to be zero if the denominator is zero.
+
+\paragraph{Comparing ordinary vs. weighted importance sampling}
+Let's consider the estimates of each method under the first-visit regime after observing a single return from a state $s$. In the weighted-average estimate, the ratio $\rho_{t:T(t)-1}$ for the single return will cancel in both the numerator and denominator, so that the estimate is equal to the observed return independent of the ratio (assuming the ratio is non-zero)! Given that this return was the only one observed, this is not unreasonable however the expectation of this quantity is $v_b(s)$ rather than $v_\pi(s)$, i.e. in the statistical sense we have a biased estimator. In contrast, the first-visit version of the ordinary importance sampling estimator in equation \ref{eq: ordinaryimportancesamplingstatevaluestimation} is \emph{always} $v_\pi(s)$ in expectation, i.e. it is unbiased; however, its value can be extreme. E.g. suppose the ratio were ten, indicating trajectory observed is ten times more likely under the target policy than it is under the behavior policy: in this case the ordinary importance sampling estimate would be \emph{ten times greater} than the observed return, and this is peculiar since the importance sampling ratio instructed us that the episode's trajectory is considered ``more representative'' of the target policy.
+
+\paragraph{Bias variance tradeoff} The differences between the first-vist methods are expressed in terms of their bias-variance tradeoffs.
+\begin{itemize}
+  \item Formally, ordinary importance sampling is unbiased but has unbounded     variance due to the fact that the variance of the ratios can be unbounded.
+\item  The weighted importance sampling scheme on the other hand is biased (although the bias converges asymptotically to zero), but has the benefit that the largest weight on any single return is one, whence if we assume bounded returns the variance of the weighted importance-sampling estimator converges to zero, even if the ratios themselves are infinite! 
+\end{itemize}
+In practice the weighted estimator has lower variance and is strongly preferred.
+\paragraph{Every visit methods for ordinary and weighted importance sampling} Both of these every-visit methods are biased, although this bias drops to zero asymptotically as the number of samples increases. In practice, we prefer every-visit methods because they remove the need to keep track of which states have been visited and which haven't, and we can more easily extend them to approximations.
+
+\paragraph{An example of infinite variance} Ordinary importance sampling estimates will typically have infinite variance whenever the returns have infinite variance, and this can happen easily in off-policy learning when trajectories contain loops. Suppose we have only one non-terminal state $s$ and there are only two actions \texttt{left} and \texttt{right}. Taking the \texttt{right} action leads us to the terminal state with no reward, whereas taking the \texttt{left} action transitions the agent with probability 0.9 back to state $s$ and with probability 0.1 to the terminal state where in the latter case the agent picks up a reward of $+1$. Realize that the target policy is to always select \texttt{left}, since this is the only way to (possibly) pick up a reward: all episodes under this policy consist of some number of (possibly zero) transitions back to $s$ followed by termination with a return of unit value. Since our task is episodic, we don't discount and the value of $s$ under the target policy is one. Now, suppose that we are attempting to estimate this state-value from off-policy data where the behavior policy selects between \texttt{left} and \texttt{right} with equal probability. To see that the variance of the ordinary importance-sampling technique is infinite, first recall that $\texttt{Var}(X) \coloneqq \mathbb E \left[ (X - \bar{X})^2 \right] = \mathbb E \left[X^2 - 2X \bar{X} + \bar{X}^2\right] = \mathbb E \left[X^2\right]  - \bar{X}^2$, whence if our mean is finite (which it is in our example) then the variance is infinite $\iff$ the expectation of the square of the random variable is infinite. Thus, we need to show that
+\[
+  \mathbb E_b \left[ \left( \prod_{t=0}^{T-1} \frac{\pi(A_t|S_t)}{b(A_t|S_t)} G_0 \right)^2 \right] = \infty.
+\]
+To compute this expectation, we break it down into cases defined based on episode length and termination. Realize that for any episode observed under our behavior policy that ends with the \texttt{right} action, the importance sampling ratio is zero because the target policy never selects this action. Therefore we are left with considering episodes that involve some number (possibly zero) of \texttt{left} actions that transition back to the only state $s$, followed by a \texttt{left} action that transitions to termination. All of these episodes have a return of exactly unit value, and so we can ignore $G_0$. To get the expected square of the random variable we now need only consider the length of each episode, where we will multiply the probability of the episode's occurrence by the square of its importance sampling ratio and then add all these terms up.
+\begin{align*}
+  &= \underbrace{\frac{1}{2} \cdot 0.1}_{\substack{\textrm{probability of observing} \\ \textrm{episode under } b}} \left(\frac{1}{0.5}\right)^2 &                                                                          \textrm{the length 1 episode} \\
+  & \hspace{10pt} + \frac{1}{2} \cdot 0.9 \cdot \frac{1}{2} \cdot 0.1     \left(\frac{1}{0.5}\frac{1}{0.5}\right)^2 &\textrm{the length 2 episode} \\
+  & \hspace{10pt} + \frac{1}{2} \cdot 0.9 \cdot \frac{1}{2} \cdot 0.9 \cdot \frac{1}{2} \cdot 0.1 \left(\frac{1}{0.5}\frac{1}{0.5}\frac{1}{0.5}\right)^2                                                                        &\textrm{the length 3 episode} \\
+  & \hspace{10pt} + \ldots \\
+  &= 0.1 \sum_{k=0}^{\infty} 0.9^k \cdot 2^{k} \cdot 2 = 0.2 \sum_{k=0}^{\infty} 1.8^k = \infty. 
+\end{align*}
 \end{document}
