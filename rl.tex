@@ -1636,7 +1636,71 @@ Suppose toward contradiction that our algorithm converges to a suboptimal policy
 \paragraph{Solving Blackjack using Monte Carlo with Exploring Starts} Because all episodes are simulated games, we can arrange for exploring starts that include all possibilities. We simply pick the dealer's cards, the payer's sum, and whether or not the player has a usable ace, all at random and with equal probabilty. As the initial policy, we can arbitrarily use the policy that sticks only on 20 or 21. The initial action-value function can be zero for all state-action pairs. 
 
 \subsubsection{Monte Carlo Control without exploring starts}
+The only way to ensure that all actions are selected infinitely often is for the agent to continue to select them. There are two approaches for this: (i) \emph{on-policy} methods which attempt to evaluate or improve the policy that is used to make decisions, e.g. Monte Carlo with exploring starts, and (ii) \emph{off-policy} methods which evaluate or improve a policy different from that used to generate the data. We first consider on-policy methods.
 
+\paragraph{On-policy methods} In on-policy control methods, the policy is generally \emph{soft}, meaning that $\pi(a|s) > 0$ for all $s \in \mathcal S$ and $a \in \mathcal A(s)$, but gradually shifted closer and closer to a deterministic optimal policy. We will use an $\epsilon$-greedy policy, meaning that most of the time they choose an action that has maximal estimated action value, but with probability $\epsilon$ they instead select a random action. All non-greedy actions are given the minimal probability of selection of $\frac{\epsilon}{|\mathcal A(s)|}$, and the remaining bulk of the probability $1 - \epsilon + \frac{\epsilon}{|\mathcal A(s)|}$ is given to the greedy action. Note that $\epsilon$-greedy policies are examples of $\epsilon$-\emph{soft} policies, defined as policies for which $\pi(a|s) \geq \frac{\epsilon}{|\mathcal A(s)|}$ for all states and actions, for some $\epsilon > 0$; among the family of $\epsilon$-soft policies, $\epsilon$-greedy policies are in some sense those that are closest to greedy.
+
+\paragraph{Overall idea of on-policy Monte Carlo methods is GPI} We will use first-visit MC methods to estimate the action-value function for the current policy. Without the assumption of exploring starts, however, we cannot simply improve the policy by making it greedy with respect to the current value function, because that would prevent further exploration of nongreedy actions. In our on-policy method we will move toward an $\epsilon$-greedy policy; for any $\epsilon$-soft policy, $\pi$, any $\epsilon$-greedy policy with respect to $q_\pi$ is guaranteed to perform better than or equal to $\pi$.
+
+\begin{algorithm}[h]
+  \caption{On-policy first-visit MC control (for $\epsilon$-soft policies),     estimates $\pi \approx \pi_*$}
+\KwInput{$\epsilon > 0$}
+\tcp{Initialization.}
+$\pi \gets$ an arbitrary $\epsilon$-soft policy \\
+$Q(s,a) \in \mathbb R$ (arbitrarily), for all $s \in \mathcal S$, $a \in \mathcal A(s)$ \\
+$\texttt{Returns}(s,a) \gets$ empty list, for all $s \in \mathcal S, a \in \mathcal A(s)$ \\
+\For{each episode, without termination} {
+  Generate an episode following $\pi$: $S_0, A_0, R_1, \ldots, S_{T-1}, A_{T-1},   R_T$ \\
+$G \gets 0$ \\
+\For{each step of the episode $t = T-1, T-2, \ldots, 0$}{
+  $G \gets \gamma G + R_{t+1}$ \\
+  \If{$S_t, A_t$ not in $S_0, A_0, S_1, A_1, \ldots, S_{t-1}, A_{t-1}$} {
+    Append $G$ to $\texttt{Returns}(S_t, A_t)$ \\
+    $Q(S_t, A_t) \gets \texttt{average}(\texttt{Returns}(S_t, A_t))$ \\
+    $A^* \gets \argmax_a Q(S_t, a)$ \tcp{With ties broken arbitrarily.}
+    \For{each $a \in \mathcal A(s)$} {
+      $\pi(a|S_t) \gets \begin{cases}
+        1 - \epsilon + \epsilon/|\mathcal A(S_t)| & \textrm{ if } a = A^* \\
+        \epsilon/|\mathcal A(S_t)| & \textrm{ if } a \neq A^*
+      \end{cases}$
+    }
+  }
+}
+}
+\end{algorithm}
+
+\paragraph{Policy improvement theorem implies improving policies at each iteration}
+We are guaranteed by the policy improvement theorem that any $\epsilon$-greedy policy with respect to $q_\pi$ is an improvement over any $\epsilon$-soft policy $\pi$. To see this, let $\pi'$ be the $\epsilon$-greedy policy. The conditions of the policy improvement theorem still apply because for any $s \in \mathcal S$:
+\begin{align}
+  q_\pi(s, \pi'(s)) &= \sum_a \pi'(a|s) q_\pi(s,a) \nonumber \\
+  \label{eq: epsilonsoftgreedy}
+                    &= \frac{\epsilon}{|\mathcal A(s)|} \sum_a q_\pi(s,a) +                       (1-\epsilon) \max_a q_\pi(s,a) \\
+                    &\geq \frac{\epsilon}{|\mathcal A(s)|} \sum_a q_\pi(s,a) + (1-\epsilon) \sum_a \frac{\pi(a|s) - \frac{\epsilon}{|\mathcal A(s)|}}{1-\epsilon} q_\pi(s,a) \nonumber
+\end{align}
+where the sum is a weighted average with non-negative weights summing to 1, and as such must be less than or equal to the largest number averaged.
+\begin{align}
+  &= \frac{\epsilon}{|\mathcal A(s)|} \sum_a q_\pi(s,a) - \frac{\epsilon}{|\mathcal A(s)|} \sum_a q_\pi(s,a) + \sum_a \pi(a|s) q_\pi(s,a)   \\
+  &= v_\pi(s).
+\end{align}
+Whence by the policy improvement theorem $\pi' \geq \pi$ (i.e. $v_{\pi'}(s) \geq v_{\pi}(s)$ for all $s \in \mathcal S$; equality only holds when both $\pi'$ and $\pi$ are optimal among the $\epsilon$-soft policies.
+
+\paragraph{Proving that we get strictly better policies at each iteration}
+Consider a new environment that is just like the original, except with the requirement that policies must be $\epsilon$-soft ``moved inside'' the environment; The new environment has the same action and state set as the original and behaves as follows. If in state $s$ and taking action $a$, then with probability $1-\epsilon$ the new environment behaves exactly like the old environment, but with probability $\epsilon$ it repicks the action at random with equal probabilities and then behaves like the old environment with the new, random action. Realize that the best one can do in this new environment with general policies is the same as the best one could do in the original environment with $\epsilon$-soft policies. Let $\tilde v_*$ and $\tilde q_*$ denote the optimal value functions for the new environment. Then, a policy $\pi$ is optimal among $\epsilon$-soft policies $\iff v_\pi = \tilde v_*$. From the definition of $\tilde v_*$, we know that is the unique solution to
+\begin{align*}
+  \tilde v_*(s) &= (1-\epsilon) \max_a \tilde q_*(s,a) +                   \frac{\epsilon}{|\mathcal A(s)|} \sum_a \tilde q_*(s,a) \\
+                &= (1-\epsilon) \max_a \sum_{s',r} \Pr(s',r|s,a) \left[ r + \gamma \tilde v_*(s')\right] + \frac{\epsilon}{|\mathcal A(s)|} \sum_a \sum_{s',r} \Pr(s', r | s, a) \left[ r + \gamma \tilde v_*(s')\right].
+\end{align*}
+When equality holds and the $\epsilon$-solf policy is no longer improved, then we also know from equation \ref{eq: epsilonsoftgreedy} that
+\begin{align*}
+  v_\pi(s) &= (1-\epsilon) \max_a q_\pi(s,a) + \frac{\epsilon}{|\mathcal A(s)|}              \sum_a q_\pi(s,a) \\
+           &= (1-\epsilon) \max_a \sum_{s',r} \Pr(s',r|s,a) \left[r + \gamma v_\pi(s')\right] + \frac{\epsilon}{|\mathcal A(s)|} \sum_a \sum_{s',r} \Pr(s',r|s,a)\left[r + \gamma v_\pi(s')\right].
+\end{align*}
+Realize that this equation is the same as the previous one, except for the substitution of $v_\pi$ for $\tilde v_*$, and because $\tilde v_*$ is the unique solution is must be the case that $v_\pi = \tilde v_*$.
+
+\paragraph{Policy iteration works for $\epsilon$-soft policies}
+Effectively, this shows that policy iteration works for $\epsilon$-soft policies; i.e. using the natural notion of greedy policy for $\epsilon$-soft policies, one is assured of improvement at each step except when the best policy has been found among the family of $\epsilon$-soft policies. Although we \emph{only} achieve the best policy among $\epsilon$-soft policies,
+we have removed the assumption of exploring starts.
 
 \subsubsection{Off-policy Prediction via Importance Sampling}
+
 \end{document}
