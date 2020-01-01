@@ -1501,8 +1501,25 @@ Sample-based learned methods mean that we learn solely from trial and error, i.e
 \subsection{Monte Carlo methods}
 Here, we do not assumpe complete knowledge of the environment; instead we only require \emph{experience} -- sample sequences of states, actions, and rewards from actual or simulated interaction with an environment. Learning from \emph{actual} experience is striking because it requires no knowledge of the environment's dynamics, and yet an optimal policy can still be obtained. Learning from \emph{simulated} experiences is powerful, and although a model is required it need only generate sample transitions as opposed to complete probability distributions of all possible transitions that is required for DP. Monte Carlo methods are a way of solving RL problems by averaging sample (complete) returns; we focus only on episodic tasks such that returns are well defined. In particular, Monte Carlo methods sample and average \emph{returns} for each state-action pair, and average \emph{rewards} for each action. Whereas we previously computed value functions from knowledge of the MDP, here we \emph{learn} value functions from sample returns with the MDP. Value functions and corresponding policies still interact to attain optimality in the same way (GPI).
 
+\paragraph{An example where computing transition probabilities is tedious, and how MC methods can help}
+Think about predicting the outcome of 12 rolls of dice, the sheer number and complexity of calculations makes them tedious and error-prone both in terms of coding and numerical precision. A Monte Carlo method, on the other hand, would simply estimate values by averaging over a large number of random samples; we just roll 12 dice a few times and see the result. Note that the Monte Carlo method doesn't require knowledge of any of the probabilities, and we don't need to exhaustively sweep through all possible outcomes in order to get an estimate for some states. Further, realize that with a Monte Carlo method, the computation required to update the value of each state does not depend on the size of the MDP; it instead depends on the length of the episode.
+
+\paragraph{Computing returns efficienty} In Monte Carlo methods, for each state in the episode, we'll want to compute the return and store it in a list of returns to be averaged over. How can we do that efficiently? Realize that if we were to write out our returns for, e.g. an episodic task which ends after five actions,
+\begin{align*}
+  G_0 &= R_1 + \gamma G_1 \\
+  G_1 &= R_2 + \gamma G_2 \\
+  G_2 &= R_3 + \gamma G_3 \\
+  G_3 &= R_4 + \gamma G_4 \\
+  G_4 &= R_5 + \gamma G_5 \\
+  G_5 &= 0
+\end{align*}
+Notice that each return is included in the equation for writing the previous time step's return. That means we can avoid duplicating computations by starting at the terminal state $G_5$ and working our way backwards.
+\paragraph{Why Monte Carlo methods are defined on episodic MDPs}
+We'll see that in the algorithms that follow, we wait until the \emph{end} of an episode beforing averaging the returns witnessed from varios states or state-action pairs. Because of this, we limit our discussion in this section to episodic MDPs which have a termination state.
+
 \subsubsection{Monte Carlo Prediction}
 Recall that the value of a state is the expected return -- expected cumulative future discounted reward--starting from that state. An obvious way to estimate it from experience is by averaging returns observed after visits to that state; as more returns are observed, weak law of large numbers guarantees the sample average converges in probability to the population mean. This idea underlies all Monte Carlo methods. In particular, suppose we wish to estimate $v_\pi(s)$, the value of a state $s$ under policy $\pi$, given a set of episodes obtained by following $\pi$ and passing through $s$. Each occurrence of state $s$ in an episode is called a \emph{visit} to $s$. Note that $s$ may be visited multiple times in the same episode; let us define the first time it is visited as the \emph{first visit} to $s$. The \emph{first-visit MC method} estimates $v_\pi(s)$ as the average of the returns following first visits to $s$, whereas the \emph{every visit MC method} averages the returns following all visits to $s$.
+
 \begin{algorithm}[h]
   \caption{First-visit MC prediction, for estimating $V \approx v_\pi$}
   \KwInput{A policy $\pi$ to be evaluated}
@@ -1521,9 +1538,10 @@ Recall that the value of a state is the expected return -- expected cumulative f
     }
   }
 \end{algorithm}
+
 Both first-visit and every-visit MC converge to $v_\pi(s)$ as the number of visits (or first visits) to $s$ goes to $\infty$. It's particularly easy to see in the case of first-visit MC: each return is an independent, identically distributed estimate of $v_\pi(s)$ with finite variance; by weak law of large numbers the sequence of averages of these estimates converges to their true expected value; each average itself is an unbiased estimate and the standard deviation of its error decreases like $\frac{1}{\sqrt n}$, where $n$ is the number of returns averaged.
 
-\paragraph{Blackjack Example} The goal is to obtain cards the sum of whose numerical values is as great as possible without exceeding 21. All face cards count as 10, an ace can count as either 1 or 11. We consider a game where we only play against the dealer. The game starts with two cards dealt to both dealer and player. \emph{One of the dealer's cards is face up and the other is face down.} If the player has 21 immediately (an ace and a 10-card), then it is called a natural and he/she wins unless the dealer also has a natural in which case we pronounce a draw. If the player doesn't have a natural, he/she can either request an additional card (hit), stop requesting cards (stick), or go bust (if the value of cards exceeds 21). If he/she goes bust, the agent loses. If the agent sticks, it becomes the dealer's turn. The dealer hits or sticks according to a fixed strategy: stick on any sum 17 or greater, and hits otherwise. If the dealer goes bust the agent wins; otherwise, the outcome is determined by whosever final sum is closer to 21. This problem is naturally formulated as an episodic MDP, where each game is an episode. Rewards of +1, -1, and 0 are given for winning, losing, and drawing respectively; all rewards within a game are zero, and we don't discount. Whence, the terminal rewards are also the returns. The agent's \emph{actions} are to hit or to stick. The states depend on the player's cards and the dealer's showing card. We assume the cards are dealt from an infinite deck (i.e. with replacement) so that there is no advantage to keeping track of which cards are already dealt. If the player holds an ace that he/she could count as 11 without going bust, then the ace is said to be \emph{useable}. In this case, it is always counted as 11, because counting it as a 1 would make the sum 11 or less, in which case there is no decision to be made because obviously the player should always hit (since in this case a hit is impossible to cause a bust, since the max valued card is 10 ignoring aces which can be treated as ones). Thus, the player makes their decision based on three variables: their current sum (12-21), the dealer's one showing card (ace-10), and whether or not he/she holds a useable ace. This makes for a total of 200 states. We consider the policy that sticks if the player's sum is 20 or 21, and otherwise hits. To find the state-value function for this policy by a Monte Carlo approach, we simulate many blackjack games using the policy and average the returns following each state.
+\paragraph{Blackjack Example} The goal is to obtain cards the sum of whose numerical values is as great as possible without exceeding 21. All face cards count as 10, an ace can count as either 1 or 11. We consider a game where we only play against the dealer. The game starts with two cards dealt to both dealer and player. \emph{One of the dealer's cards is face up and the other is face down.} If the player has 21 immediately (an ace and a 10-card), then it is called a natural and he/she wins unless the dealer also has a natural in which case we pronounce a draw. If the player doesn't have a natural, he/she can either request an additional card (hit), stop requesting cards (stick), or go bust (if the value of cards exceeds 21). If he/she goes bust, the agent loses. If the agent sticks, it becomes the dealer's turn. The dealer hits or sticks according to a fixed strategy: stick on any sum 17 or greater, and hits otherwise. If the dealer goes bust the agent wins; otherwise, the outcome is determined by whosever final sum is closer to 21. This problem is naturally formulated as an episodic MDP, where each game is an episode. Rewards of +1, -1, and 0 are given for winning, losing, and drawing respectively; all rewards within a game are zero, and we don't discount. Whence, the terminal rewards are also the returns. The agent's \emph{actions} are to hit or to stick. The states depend on the player's cards and the dealer's showing card. We assume the cards are dealt from an infinite deck (i.e. with replacement) so that there is no advantage to keeping track of which cards are already dealt, and further this will make our state respect the Markov property. If the player holds an ace that he/she could count as 11 without going bust, then the ace is said to be \emph{useable}. In this case, it is always counted as 11, because counting it as a 1 would make the sum 11 or less, in which case there is no decision to be made because obviously the player should always hit (since in this case a hit is impossible to cause a bust, since the max valued card is 10 ignoring aces which can be treated as ones). Thus, the player makes their decision based on three variables: their current sum (12-21), the dealer's one showing card (ace-10), and whether or not he/she holds a useable ace. This makes for a total of 200 states. We consider the policy that sticks if the player's sum is 20 or 21, and otherwise hits. To find the state-value function for this policy by a Monte Carlo approach, we simulate many blackjack games using the policy and average the returns following each state.
 
 \paragraph{Comparing why DP not suitable for task of blackjack} Although we have complete knowledge of the environment in the blackjack task, it wouldn't be easy to apply DP methods to compute the value function. DP methods requrie the distribution of next events -- in particular, they require the environments dynamics as given by the four-argument function $\Pr(s', r | s, a)$ -- and it is not easy to determine this for blackjack. E.g. suppose the player's sum is 14 and they choose to stick. What is the probability of the agent terminating with a reward of $+1$ as a function of the dealer's showing card? All of the probabilities must be computed \emph{before} DP can be applied, and these computations are complex and error-prone for this example. In contrast, generating the sample games required by MC methods is easy, and this is the case surprisingly often.
 
@@ -1553,7 +1571,25 @@ Whereas the DP diagram shows all possible transitions, the Monte Carlo diagram s
 \paragraph{Computational expense of estimating the value of a single state is independent of the number of states} This can make Monte Carlo methods particularly attractice when one requires the value of only one or a subset of states. One can generate many sample episodes starting from the states of interest, averaging returns from only these states, ignoring all others. This is a third advantage of Monte Carlo methods can have over DP method, after the ability to learn from (simulated) experience.
 
 \subsubsection{Monte Carlo Estimation of Action Values}
-If a model is not available, then it is particularly useful to estimate \emph{action} values (the value of state-action pairs) rather than \emph{state} values. With a model, state values alone are sufficient to determine a policy: one simply looks one step ahead and chooses whichever action leads to the best combination of reward and next state. Without a model, however, state values alone are not sufficient: one must explicitly estimate the value of each action in order for the values to be useful in suggesting a policy. Thus, a primary goal for Monte Carlo methods is to estimate $q_*$. To achieve this, we consider the policy evaluation problem for action values.
+If a model is not available, then it is particularly useful to estimate \emph{action} values (the value of state-action pairs) rather than \emph{state} values. With a model, state values alone are sufficient to determine a policy: one simply looks one step ahead and chooses whichever action leads to the best combination of reward and next state.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle,scale=3/4] (root) at (0, 0) {};
+    \node[left=1mm of root] {$s$};
+    \node[draw,circle,fill,scale=1/2] (a0) at (-1, -1) {};
+    \node[left=1mm of a0] {$s$};
+    \node[draw,circle,fill,scale=1/2] (a1) at ( 0, -1) {};
+    \node[draw,circle,fill,scale=1/2] (a2) at (+1, -1) {};
+    \node[right=3mm of a2] {$\argmax_a q_\pi(s,a)$};
+    \foreach \x in {0, 1, 2} {
+      \draw[->] (root) -- (a\x);
+    }
+  \end{tikzpicture}
+  \caption{\footnotesize Action values lend themselves toward learning a policy improvement: we simply greedily select the action that leads to the maximum return from a given state. But, realize that in order to make the comparison, i.e. to make the call to $\argmax_a$ we must have estimates for $q_\pi(s,a)$ for each $a \in \mathcal A(s)$. This is why RL methods must maintain exploration.}
+\end{figure}
+
+Without a model, however, state values alone are not sufficient: one must explicitly estimate the value of each action in order for the values to be useful in suggesting a policy. Thus, a primary goal for Monte Carlo methods is to estimate $q_*$. To achieve this, we consider the policy evaluation problem for action values.
 
 \paragraph{Policy evaluation problem for action values} The problem is to estimate $q_\pi(s,a)$, the expected return when starting in state $s$, taking action $a$, and thereafter following policy $\pi$. The Monte Carlo methods for this are essentially the same as just presented for state values, except now we talk about visits to a state-action pair rather than to a state. A state-action pair $s,a$ is said to be visited in an episode if ever the state $s$ is visited and action $a$ is taken in it. The every-visit MC method estimates the value of a state-action pair as the average of the returns that have followed all the visits to it, whereas the first-visit MC method averages the returns following the first time in each episode that the state was visited and the action was selected. These method both converge to the true expected values as the number of visits to each state-action pair approaches infinity.
 
@@ -1596,7 +1632,7 @@ For the moment, we assume that we do indeed observe an infinite number of episod
 
 \paragraph{Policy Improvement} Policy improvement is done by making the policy greedy with respect to the current value function. In this case we have an \emph{action}-value function, and therefore no model is needed to construct the greedy policy. For any action-value function $q$, the corresponding greedy policy is the one that, for each $s \in \mathcal S$, deterministically chooses an action with maximal action-value, i.e.
 \[
-  \pi(s) \coloneqq \argmax_a q(s,a).
+  \pi_{k+1}(s) \coloneqq \argmax_a q_{\pi_k}(s,a).
 \]
 Policy improvement then can be done by constructing each $\pi_{k+1}$ as the greedy policy with respect to $q_{\pi_k}$.
 The policy improvement theorem then applies to $\pi_k$ and $\pi_{k+1}$ because for all $s \in \mathcal S$:
@@ -1621,8 +1657,8 @@ Whence our policy improvement assures us that eacy $\pi_{k+1}$ is uniformly bett
     $G \gets \gamma G + R_{t+1}$ \\
     \If{$S_t, A_t$ does not appear in $S_0, A_0, S_1, A_1, \ldots, S_{t-1},             A_{t-1}$} {
 Append $G$ to $\texttt{Returns}(S_t, A_t)$ \\
-$Q(S_t, A_t) \gets \texttt{average}(\texttt{Returns}(S_t, A_t))$ \\
-$\pi(S_t) \gets \argmax_a Q(S_t, a)$
+$Q(S_t, A_t) \gets \texttt{average}(\texttt{Returns}(S_t, A_t))$ \tcp{Policy Evaluation}
+$\pi(S_t) \gets \argmax_a Q(S_t, a)$ \hspace{61pt} \tcp{Policy Improvement}
     }
   }
 }
@@ -1633,30 +1669,34 @@ Note that the pseudocode in algorithm \ref{alg: montecarloes} is inefficient bec
 \paragraph{Convergence of Monte Carlo with Exploring Starts}
 Suppose toward contradiction that our algorithm converges to a suboptimal policy. Realize that the value function would eventually converge to the value function for that policy, and that in turn would cause the policy to change. Stability is achieved only when both the policy and the value function are optimal.
 
-\paragraph{Solving Blackjack using Monte Carlo with Exploring Starts} Because all episodes are simulated games, we can arrange for exploring starts that include all possibilities. We simply pick the dealer's cards, the payer's sum, and whether or not the player has a usable ace, all at random and with equal probabilty. As the initial policy, we can arbitrarily use the policy that sticks only on 20 or 21. The initial action-value function can be zero for all state-action pairs. 
+\paragraph{Solving Blackjack using Monte Carlo with Exploring Starts} Because all episodes are simulated games, we can arrange for exploring starts that include all possibilities. We simply pick the dealer's cards, the payer's sum, and whether or not the player has a usable ace, all at random and with equal probabilty from their respective domains; our previous formulation of blackjack already suits these environment conditions, all we have to do is take a random action at the start of each episode. As the initial policy, we can arbitrarily use the policy that sticks only on 20 or 21. The initial action-value function can be zero for all state-action pairs. 
 
 \subsubsection{Monte Carlo Control without exploring starts}
 The only way to ensure that all actions are selected infinitely often is for the agent to continue to select them. There are two approaches for this: (i) \emph{on-policy} methods which attempt to evaluate or improve the policy that is used to make decisions, e.g. Monte Carlo with exploring starts, and (ii) \emph{off-policy} methods which evaluate or improve a policy different from that used to generate the data. We first consider on-policy methods.
 
-\paragraph{On-policy methods} In on-policy control methods, the policy is generally \emph{soft}, meaning that $\pi(a|s) > 0$ for all $s \in \mathcal S$ and $a \in \mathcal A(s)$, but gradually shifted closer and closer to a deterministic optimal policy. We will use an $\epsilon$-greedy policy, meaning that most of the time they choose an action that has maximal estimated action value, but with probability $\epsilon$ they instead select a random action. All non-greedy actions are given the minimal probability of selection of $\frac{\epsilon}{|\mathcal A(s)|}$, and the remaining bulk of the probability $1 - \epsilon + \frac{\epsilon}{|\mathcal A(s)|}$ is given to the greedy action. Note that $\epsilon$-greedy policies are examples of $\epsilon$-\emph{soft} policies, defined as policies for which $\pi(a|s) \geq \frac{\epsilon}{|\mathcal A(s)|}$ for all states and actions, for some $\epsilon > 0$; among the family of $\epsilon$-soft policies, $\epsilon$-greedy policies are in some sense those that are closest to greedy.
+\paragraph{On-policy methods} In on-policy control methods, the policy is generally \emph{soft}, meaning that $\pi(a|s) > 0$ for all $s \in \mathcal S$ and $a \in \mathcal A(s)$, but gradually shifted closer and closer to a deterministic optimal policy. We will use an $\epsilon$-greedy policy, meaning that most of the time they choose an action that has maximal estimated action value, but with probability $\epsilon$ they instead select a random action. All non-greedy actions are given the minimal probability of selection of $\frac{\epsilon}{|\mathcal A(s)|}$, and the remaining bulk of the probability $1 - \epsilon + \frac{\epsilon}{|\mathcal A(s)|}$ is given to the greedy action. Note that $\epsilon$-greedy policies are examples of $\epsilon$-\emph{soft} policies, defined as policies for which $\pi(a|s) \geq \frac{\epsilon}{|\mathcal A(s)|}$ for all states and actions, for some $\epsilon > 0$; among the family of $\epsilon$-soft policies, $\epsilon$-greedy policies are in some sense those that are closest to greedy. Note that in defining our policy in this way, we ensure the agent has a positive probability of visiting each state-action pair indefinitely. Further, realize that all $\epsilon$-soft policies are stochastic.
+
+\paragraph{Example of when exploring starts is non-feasible} The assumption of exploring starts is not always reasonable. For example, what's the initial state-action pair for a self-driving car? How can we ensure the agent has a chance of starting in all possible states? We would need to put the car in many different configurations, e.g. in the middle of a busy freeway.
 
 \paragraph{Overall idea of on-policy Monte Carlo methods is GPI} We will use first-visit MC methods to estimate the action-value function for the current policy. Without the assumption of exploring starts, however, we cannot simply improve the policy by making it greedy with respect to the current value function, because that would prevent further exploration of nongreedy actions. In our on-policy method we will move toward an $\epsilon$-greedy policy; for any $\epsilon$-soft policy, $\pi$, any $\epsilon$-greedy policy with respect to $q_\pi$ is guaranteed to perform better than or equal to $\pi$.
 
 \begin{algorithm}[h]
   \caption{On-policy first-visit MC control (for $\epsilon$-soft policies),     estimates $\pi \approx \pi_*$}
-\KwInput{$\epsilon > 0$}
+\KwInput{$\epsilon > 0$.}
+\KwOutput{An optimal $\epsilon$-soft policy.}
 \tcp{Initialization.}
-$\pi \gets$ an arbitrary $\epsilon$-soft policy \\
+$\pi \gets$ an arbitrary $\epsilon$-soft policy \tcp{Note we require initialization with an $\epsilon$-soft policy.}
 $Q(s,a) \in \mathbb R$ (arbitrarily), for all $s \in \mathcal S$, $a \in \mathcal A(s)$ \\
 $\texttt{Returns}(s,a) \gets$ empty list, for all $s \in \mathcal S, a \in \mathcal A(s)$ \\
 \For{each episode, without termination} {
-  Generate an episode following $\pi$: $S_0, A_0, R_1, \ldots, S_{T-1}, A_{T-1},   R_T$ \\
+  Generate an episode following $\pi$: $S_0, A_0, R_1, \ldots, S_{T-1}, A_{T-1},   R_T$ \tcp{Just follow $\pi$, no ES.}
 $G \gets 0$ \\
 \For{each step of the episode $t = T-1, T-2, \ldots, 0$}{
   $G \gets \gamma G + R_{t+1}$ \\
   \If{$S_t, A_t$ not in $S_0, A_0, S_1, A_1, \ldots, S_{t-1}, A_{t-1}$} {
     Append $G$ to $\texttt{Returns}(S_t, A_t)$ \\
     $Q(S_t, A_t) \gets \texttt{average}(\texttt{Returns}(S_t, A_t))$ \\
+    \tcp{Policy improvement}
     $A^* \gets \argmax_a Q(S_t, a)$ \tcp{With ties broken arbitrarily.}
     \For{each $a \in \mathcal A(s)$} {
       $\pi(a|S_t) \gets \begin{cases}
@@ -1716,6 +1756,37 @@ Although off-policy learning is arguably the key to learning multi-step predicti
 \paragraph{The assumption of \emph{coverage}}
 In order to use episodes from $b$ to estimate values for $\pi$, we \emph{require} that every action taken under $\pi$ is also taken, at least occassionally, under $b$; i.e. we require that $\pi(a|s) > 0 \implies b(a|s) > 0$, often referred to as the assumption of \emph{coverage}. It follows that $b$ must be stochastic in states where it is not identical to $\pi$. On the other hand, the target policy $\pi$ could be deterministic, e.g. a deterministic greedy policy with respect to the current estimate of the action-value function. The target policy becomes a deterministic optimal policy while the behavior policy remains stochastic and more exploratory, for example, an $\epsilon$-greedy policy.
 
+\paragraph{Deriving importance sampling}
+We start with the definition of expectation:
+\begin{align*}
+  \mathbb E_\pi \left[X\right] &\coloneqq \sum_{x \in X} x \pi(x) \\
+                               &= \sum_{x \in X} x \pi(x) \frac{b(x)}{b(x)} &\textrm{Multiplying by 1.}\\
+                               &= \sum_{x \in X} x \underbrace{\frac{\pi(x)}{b(x)}}_{\substack{\textrm{importance sampling} \\     \textrm{ratio}} \coloneqq \rho(x)} b(x) &\textrm{Algebraic re-arrangement.}\\
+  &= \mathbb E_b \left[X \rho(X)\right].
+\end{align*}
+To compute an importance-sample expectation in practice, it amounts to taking a weighted sum where the weights are given by $\rho(\cdot)$. So,
+\[
+  \mathbb E_\pi\left[X\right] \approx \frac{1}{n} \sum_{i=1}^n x_i \rho(x_i) \hspace{25pt} x_i \sim b
+\]
+
+\paragraph{Example computation with importance sampling} Suppose we are given the following probability mass functions:
+\begin{table}[h]
+  \centering
+  \begin{tabular}{l | c | c}
+    $x$ & $b(x)$ & $\pi(x)$ \\
+    \hline
+    1   & 0.85   & 0.30 \\
+    2   & 0.05   & 0.40 \\
+    3   & 0.05   & 0.10 \\
+    4   & 0.05   & 0.20
+  \end{tabular}
+\end{table}
+Further, suppose we draw three realizations $x_i \sim b$, where in particular we yield values $x_b = [1, 3, 1]$. In this example, the importance-sample average is given by
+\[
+  \frac{1}{n} \sum_{i=1}^n x \rho(x) = \frac{\left(1 \times \frac{0.3}{0.85}\right) + \left(3 \times \frac{0.1}{0.05}\right) + \left(1 \times \frac{0.3}{0.85}\right)}{2} = 2.24.
+\]
+In this example, it happens to be that $\mathbb E_\pi[X] = 2.2$, so we were not too far off.
+
 \paragraph{Importance sampling as a way of estimating expected values under target distribution given observations drawn from behavior policy} Off-policy methods utilizie \emph{importance sampling} in order to estimate expected values under the target distribution given samples where our agent acts according to the behavior policy. The strategy is to weight returns according to their relative probability of their trajectories occurring under the target and behavior policies using an \emph{importance-sampling ratio}. Given a starting state $S_t$, the probability of the subsequent state-action trajectory $A_t, S_{t+1}, A_{t+1}, \ldots, S_T$, occurring under any policy $\pi$ is
 \begin{align*}
   \Pr(\{A_t, S_{t+1}, A_{t+1}, \ldots, S_T | S_t, A_{t:T-1} \sim \pi\} &= \pi(A_t|S_t) \Pr(S_{t+1} | S_t, A_t) \pi(A_{t+1} | S_{t+1}) \Pr(S_T | S_{T-1},                                                                          A_{T-1}) \\
@@ -1723,11 +1794,11 @@ In order to use episodes from $b$ to estimate values for $\pi$, we \emph{require
 \end{align*}
 where our probabilities are the state-transition probabilities, i.e. $\Pr(s' | s, a) \coloneqq \Pr(S_t = s' | S_{t-1} = s, A_{t-1} = a) = \sum_{r \in \mathcal R} \Pr(s', r | s, a)$. The relative probability of the trajectory under the target and behavior policies (i.e. the importance sampling ratio) is
 \[
-  \rho_{t:T-1} \coloneqq \frac{\prod_{k=t}^{T-1} \pi(A_k |S_k) \Pr(S_{k+1} | S_k, A_k)}{\prod_{k=t}^{T-1} b(A_k|S_k) \Pr(S_{k+1} | S_k, A_k)} = \prod_{k=t}^{T-1} \frac{\pi(A_k|S_k)}{b(A_k | S_k)}.
+  \rho_{t:T-1} \coloneqq \frac{\Pr(\textrm{trajectory under } \pi)}{\Pr(\textrm{trajectory under } b)} = \frac{\prod_{k=t}^{T-1} \pi(A_k |S_k) \Pr(S_{k+1} | S_k, A_k)}{\prod_{k=t}^{T-1} b(A_k|S_k) \Pr(S_{k+1} | S_k, A_k)} = \prod_{k=t}^{T-1} \frac{\pi(A_k|S_k)}{b(A_k | S_k)}.
 \]
 In moving to the last equality, there was a cancellation of terms; this is critical as these trajectory probabilities depend on the MDP transition probabilities which are generally unknown. Whence, this last equality shows us that the importance sampling ratio depends only on the two policies and the sequence, not on the MDP. Recall that we wish to estimate the expected returns (values) under the target policy, but we only have access to returns $G_t$ due to the behavior policy. These returns have the wrong expectation, namely $\mathbb E \left[ G_t | S_t = s \right] = v_b(s)$ and cannot be averaged to obtain $v_\pi$. Instead, we will use importance sampling, where the ratio $\rho_{t:T-1}$ transforms the returns to have the right expected value,
 \begin{equation}
-  \mathbb E \left[ \rho_{t:T-1} G_t | S_t = s \right] = v_\pi(s).
+  \mathbb E_b \left[ \rho_{t:T-1} G_t | S_t = s \right] = v_\pi(s).
 \end{equation}
 \paragraph{Monte Carlo algorithm for Importance Sampling}
 It is at this point that we are ready to provide our Monte Carlo algorithm for averaging returns from of observed episodes following policy $b$ to estimate $v_\pi(s)$. It will be convenient to define time steps in a way that increases across episode boundaries, e.g. if the first episode ends in a terminal state at time $t=100$, then the next episode is said to begin at time $t=101$; in this way, we can refer to particular steps in particular episodes. For an every-visit method, define
@@ -1765,4 +1836,94 @@ To compute this expectation, we break it down into cases defined based on episod
   & \hspace{10pt} + \ldots \\
   &= 0.1 \sum_{k=0}^{\infty} 0.9^k \cdot 2^{k} \cdot 2 = 0.2 \sum_{k=0}^{\infty} 1.8^k = \infty. 
 \end{align*}
+
+\paragraph{A note on finding optimal deterministic policies} Realize that off-policy learning with an $\epsilon$-soft behavior policy and a deterministic target policy is capable of finding an optimal deterministic policy.
+
+% 1. Which approach ensures continual exploration
+% - Exploring Starts
+% - On policy learning with an $\epsilon$-soft policy, since $\epsilon$-soft % policies assign non-zero probabilities to all state-action pairs.
+% - Off policy learning with an $\epsilon$-soft behavior policy and a % deterministic target policy
+% 2. When can MC methods, as defined in the course, beapplied
+% - When the problem is episodic and there are sequences of states, actions, and % rewards
+% - When the problem is episodic and there is a model that produces samples of the % next state and reward
+% 3. Which of the following learning settings are examples of off-policy learning?
+% - Learning about multiple policies simultaneously while following a single % behavior policies
+% - Learning the optimal policy while continuing to explore
+% - Learning from data generated by a human expert
+% 4. If a trajectory starts at time $t$ and ends at time $T$, what is its relative % probability under the target policy $\pi$ and behavior policy $b$?
+% $\prod_{t=1}^{T-1} \frac{\pi(A_k|S_k)}{b(A_k|S_k)}$, i.e. the importance % sampling ratio that is used to weight returns in the off-policy MC policy % evaluation.
+% 5.  When is it possible to determine a policy that is greedy with respect to the % value functions $v_\pi$, $q_\pi$ for the policy $\pi$?
+% - When action values $q_\pi$ and a model are available
+% - When action values $q_\pi$ are available but no model is available
+% - + at least one more!!
+% 6. MC methods in RL work by
+% averaging sample returns
+% 7. Which is a requirement for using MC policy eval with a behavior policy for a % target policy $\pi$
+% For each state $s$ and action $a$ if $\pi(a|s) > 0$ then $b(a|s) > 0$.
+% 8. Suppose state $s$ has been visited three times, with corresponding returns of % 8, 4, 3. What is the MC estimate for the value of $s$
+% 5
+% 9. When does MC prediction perform its first update?
+% At the end of the first episode
+% 10. In MC prediction of state-values, memory requirements depend on
+% The length of the episodes
+% 11. For MC prediction of state-values, the number of updates at the end of an % episode depends on
+% The length of the episode
+% 12. Which approach can find an optimal deterministic policy?
+% Exploring Starts
+% Not!! epsilon-greedy exploration
+% 13. In an epsilond-greedy policy action over A actions, what is the probability % of the highest valued action if there are no other actions with the same value?
+% 1 - epsilon + epsilon / A
+
+\paragraph{Algorithm for off-policy Monte Carlo prediction} We provide an algorithm here.
+\begin{algorithm}[h]
+  \caption{Every-visit MC prediction, for estimating $V \approx v_\pi$}
+  \KwInput{A policy $\pi$ to be evaluated, a policy $b$ which dictates behavior}
+  \tcp{Initialization}
+  $V(s) \in \mathbb R$, arbitrarily, for all $s \in \mathcal S$ \\
+  $\texttt{Returns(s)} \gets $ an empty list, for all $s \in \mathcal S$ \\
+  \For{each episode, without termination} {
+    Generate an episode following $b: S_0, A_0, R_1, S_1, \ldots, S_{T-1},     A_{T-1}, R_T$ \\
+$G \gets 0$, $W \gets 1$ \\
+    \For{each step of the episode $t = T-1, T=-2, \ldots, 0$} {
+      $G \gets \gamma WG + R_{t+1}$ \\
+      Append $G$ to $\texttt{Returns}(S_t)$ \\
+      $V(S_t) \gets \texttt{average}(\texttt{Returns}(S_t))$ \\
+      $W \gets W \frac{\pi(A_t|S_t)}{b(A_t|S_t)}$
+    }
+  }
+  \label{alg: everyvisitmcpredictionalgo}
+\end{algorithm}
+
+Realize that it is valid to compute $\rho$ incrementally as we have done in algorithm \ref{alg: everyvisitmcpredictionalgo}. To see why realize that our algorithm iterates from time step $T-1$ backward to time step $t$,
+\begin{align*}
+  \rho_{t:T-1} &\coloneqq \prod_{k=t}^{T-1} \frac{\pi(A_k|S_k)}{b(A_k|S_k)} \\
+               &= \underset{\longleftarrow}{\rho_t \rho_{t+1} \rho_{t+2} \ldots \rho_{T-2} \rho_{T-1}}
+\end{align*}
+Whence we see that $W_1 \gets \rho_{T-1}$, $W_2 \gets \rho_{T-1} \rho_{T-2}$, $W_3 \gets \rho_{T-1} \rho_{T-2} \rho_{T-3}$, etc., and that each time step adds one additional term to the product and reuses all previous terms; we compute this recursively without having to store all past values of $\rho$.
+
+\subsection{Summary}
+\paragraph{Advantages of MC over DP methods}
+Monte Carlo methods present four advantages over DP methods.
+\begin{enumerate}
+\item They can be used to learn optimal behavior directly from interaction with   the environment, with no model of the environment's dynamics.
+\item They can be used with simulation or \emph{sample models}; for surprisingly many applications it is easy to simulate sample episodes even though it is difficult to construct the kind of explicit model of transition probabilities required by DP methods.
+\item It is easy and efficient to \emph{focus} MC methods on a small subset of the states; a region of special interest can be accurately evaluated without going to the expense of accurately evaluating the rest of the state set.
+\item They may be less harmed by violations of the Markov property, because they do not update their value estimates on the basis of the value estimates of successor states, i.e. because they do not bootstrap.
+\end{enumerate}
+
+\paragraph{MC methods adhere to GPI}
+Rather than use a model to compute the value of each state, MC methods simply average many returns that start in that state. Because a state's value is the expected return, this average can become a good approximation to the value (function). In control methods we are interested in approximating the action-value function because they can be used directly to optimize the policy without requiring a model of the environment's transition dynamics. MC methods interweave policy evaluation and policy improvement on an episode-by-episode basis, and they can be incrementally implemented on an episode-by-episode basis as well.
+
+\paragraph{The problem of maintaining exploration} It's not enough to simply act upon an existing optimal policy deterministically, because we will not observe returns for all states in this case, and without being able to evaluate against alternatives we may never learn the optimal action. One approach is to assume exploring starts, i.e. that each episode starts in an arbitrary state-action pair with strictly positive probability; exploring starts aren't always feasible e.g. autonomous cars. In \emph{on-policy} methods, the agent commits to always exploring and tries to find the best policy that still explores. In \emph{off-policy} methods, the agent also explores, but learns a deterministic optimal policy that may be unrelated to the policy followed.
+
+\paragraph{Off-policy prediction} This is the idea of learning the value function of a \emph{target policy} when data was generated by following a different \emph{behavior policy}. These learning methods rely on \emph{importance sampling} to reweight returns by the ratio of the probabilities of the trajectory, i.e. taking the observed action(s) and landing in the observed state(s), under the two policies; this has the effect of transforming the expectation of the behavior policy to match the expectation under the target policy. \emph{Ordinary} importance sampling uses a simple average of weighted returns, is unbiased, but has large(r) possibly infinite variance, whereas on the other hand \emph{weighted} importance sampling uses a weighted average, is a biased estimator, but always has finite variance (if returns are bounded) and is preferred in practice.
+
+\paragraph{Contrasting MC with DP} There are two major differences.
+\begin{enumerate}
+  \item MC methods operate on sample experience, and thus can be used for direct     learning without a model.
+\item MC methods do not bootstrap, i.e. they do not update their value estimates based on the value estimates for other states.
+\end{enumerate}
+It's interesting to note that these two differences are not tightly linked, and can be de-coupled. In the next section, we will learn about methods that learn from experience, similar to MC, but also bootstrap, similar to DP.
+
+
 \end{document}
