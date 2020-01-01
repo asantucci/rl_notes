@@ -1901,7 +1901,7 @@ Realize that it is valid to compute $\rho$ incrementally as we have done in algo
 \end{align*}
 Whence we see that $W_1 \gets \rho_{T-1}$, $W_2 \gets \rho_{T-1} \rho_{T-2}$, $W_3 \gets \rho_{T-1} \rho_{T-2} \rho_{T-3}$, etc., and that each time step adds one additional term to the product and reuses all previous terms; we compute this recursively without having to store all past values of $\rho$.
 
-\subsection{Summary}
+\subsubsection{Summary}
 \paragraph{Advantages of MC over DP methods}
 Monte Carlo methods present four advantages over DP methods.
 \begin{enumerate}
@@ -1925,5 +1925,66 @@ Rather than use a model to compute the value of each state, MC methods simply av
 \end{enumerate}
 It's interesting to note that these two differences are not tightly linked, and can be de-coupled. In the next section, we will learn about methods that learn from experience, similar to MC, but also bootstrap, similar to DP.
 
+\subsection{Temporal Difference Learning}
+\emph{Temporal Difference} (TD) methods are a combination of Monte Carlo (MC) and Dynamic Programming (DP). Like MC methods, TD methods can learn directly from raw experience without a model of the environment's dynamics. Like DP, TD methods update estimates based in part on other learned estimates, without waiting for a final outcome, i.e. they bootstrap.
+\subsubsection{TD Prediction}
+TD and MC methods use experience to solve the prediction problem. Given some experience following a policy $\pi$, both methods update their estimate $V$ of $v_\pi$ for non-terminal states $S_t$ occurring in that experience. Roughly speaking, MC methods wait until the return following the visit is known, then use that return as a target for $V(S_t)$; this happens at the end of an episode. 
+\paragraph{Constant $\alpha$-MC}
+A simple every-visit MC method appropriate for non-stationary environments is given by the update rule
+\[
+  V(S_t) \gets V(S_t) + \alpha \left[ G_t - V(S_t)\right],
+\]
+where here $G_t$ is the actual return following time $t$, and $\alpha$ is a constant step-size parameter. We call this method constant-$\alpha$ MC.
+\paragraph{One-step TD}
+Whereas a constant-$\alpha$ MC requires we wait until the end of the episode to determine the increment to $V(S_t)$, in contrast TD methods need only wait until the next time step. At time $t+1$ they immediately form a target and make a useful update using the observed reward $R_{t+1}$ and the estimate $V(S_{t+1})$. The simplest TD method makes the update
+\begin{equation}
+  \label{eq: simplesttdupdate}
+  V(S_t) \gets V(S_t) + \alpha \left[ R_{t+1} + \gamma V(S_{t+1}) - V(S_t)\right]
+\end{equation}
+immediately upon transition to $S_{t+1}$ and receiving $R_{t+1}$. In effect, the target for the MC update is $G_t$ whereas the target for the TD update is $R_{t+1} + \gamma V(S_{t+1})$. The method we've outlined here is referred to as TD(0) or one-step TD, and it is a special case of a family of algorithms called $TD(\lambda)$ and $n$-step TD.
+\begin{algorithm}[h]
+  \caption{Tabular TD(0) for estimating $v_\pi$}
+  \KwInput{The policy $\pi$ to be evaluated; step size $\alpha \in (0, 1]$}
+  Initialize $V(s)$, for all $s \in \mathcal S^+$, arbitrarily except that   $V(\texttt{terminal}) = 0$ \\
+\For{each episode} {
+  Initialize $S$ \\
+  \For{each step in the episode, until state $S$ is terminal} {
+    $A \gets $ action given by $\pi$ for $S$ \\
+    Take action $A$, observe $R$, $S'$ \\
+    $V(S) \gets V(S) + \alpha \left[ R + \gamma V(S') - V(S) \right]$ \\
+    $S \gets S'$
+  }
+}
+\end{algorithm}
+Realize that TD(0) bases its updates in part on an existing estimate, therefore we say that it is a bootstrapping method, similar to DP. Recall from before that
+\begin{align}
+  \label{eq: mcupdatetarget}
+  v_\pi(s) &\coloneqq \mathbb E_\pi \left[G_t | S_t = s \right] \\
+           &= \mathbb E_\pi \left[R_{t+1} + \gamma G_{t+1} | S_t = s \right]                       &\textrm{from equation \ref{eq: recursivereturnformulation}} \\
+  \label{eq: dpupdatetarget}
+           &= \mathbb E_\pi \left[ R_{t+1} + \gamma v_\pi(S_{t+1}) | S_t = s \right]
+\end{align}
+Roughly speaking, MC methods use an estimate of \ref{eq: mcupdatetarget} as a target, whereas DP methods use as estimate of \ref{eq: dpupdatetarget} as a target. To be clear, the MC target is an \emph{estimate} because the population expectation is unknown, and in place of this we use a sample average of returns. The DP target is also an \emph{estimate}, where in this case we know the environment dynamics and so the expectation is well defined and available to compute, but instead it's an estimate because $v_\pi(S_{t+1})$ is not known and instead we use $V(S_{t+1})$. Finally, the TD target is an estimate for both reasons: it samples the expected returns as seen in equation \ref{eq: dpupdatetarget} \emph{and} it uses the current estimate of $V$ instead of the true $v_\pi$. This is how TD combines the sampling of MC with the bootstrapping of DP.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+  \end{tikzpicture}
+\end{figure}
+\subsubsection{Optimality of $\texttt{TD}(0)$}
+\paragraph{Batch updating} Suppose there is available only a finite amount of experience, e.g. 10 episodes or 100 time steps. A common approach with incremental learning methods is to present the experience repeatedly until the method converges upon an answer. I.e. given an approximated value function $V$, then we increment according to one of
+\[
+V(S_t) \gets V(S_t) + \alpha \left[G_t - V(S_t)\right]
+\]
+or
+\[
+V(S_t) \gets V(S_t) + \alpha \left[R_{t+1} + \gamma V(S_{t+1}) - V(S_t)\right]
+\]
+for every time step $t$ at which a non-terminal state is visited, but the value function is changed only once by the sum of all the increments. Then, all available experience is processed again with the new value function to produce a new overall increment, and so on until the process converges. This process is called \emph{batch updating} because the updates are made only after processing one complete \emph{batch} of training data.
+
+\paragraph{TD(0) converges determinstically to a single answer independent of   step-size parameter}
+Note that under batch updating, as long as $\alpha$ is chosen sufficiently small, then no matter its value TD(0) will converge deterministically to a single answer. This is in contrast to using a constant $\alpha$ with a MC method, which would also converge deterministically under the same conditions but to a different answer. We need to understand why these two methods produce two different answers. Let's take a look at a couple of examples first.
+
+\paragraph{Random walk under batch updating} 
 
 \end{document}
