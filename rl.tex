@@ -173,6 +173,7 @@ Note that the sum of the weights is given by $(1-\alpha)^n + \sum_{i=1}^n \alpha
 
 \paragraph{Varying Step-Size Parameter from step-to-step} Let $\alpha_n(a)$ denote the step-size parameter used to process the reward received after the $n$-th selection of action $a$. The choice of $\alpha_n(a) = \frac{1}{n}$ results in the sample-average action-value strategy, which is guaranteed to converge to the true action-values by the weak law of large numbers. But, convergence isn't guaranteed for all choices of the sequence $\{\alpha_n(a)\}$. To ensure convergence with probability 1, we require that
 \begin{equation}
+  \label{eq: conditionsrequiredtoassureconvergencewithprobabilityone}
   \sum_{n=1}^{\infty} \alpha_n(a) = \infty \hspace{25pt} \textrm{ and } \hspace{25pt} \sum_{n=1}^{\infty} \alpha_n^2(a) < \infty.
 \end{equation}
 The first condition is required to guarantee that the steps are large enough to eventually overcome any initial conditions (i.e. that we revisit actions infinitely many times), and the second condition guarantees that eventually, the step sizes become small enough to assure convergence. Note that both conditions are met for the sample-average case of $\alpha_n(a) = \frac{1}{n}$, but \emph{not} for the case of the constant step size parameter $\alpha_n(a) = \alpha$. In the latter case, the second condition isn't met, indicating that the estimates may never completely converge but instead continue to vary in response to the most recently received rewards; this is actually \emph{desireable} in the nonstationary environment.
@@ -2018,6 +2019,17 @@ On the other hand, is it really necessary to wait until the final outcome is kno
 \paragraph{TD and generalization: a scenario where TD update is better on average than an MC update} Suppose you have lots of experience driving home from work. Then, you move to a new building and a new parking lot, but you still enter the highway at the same place! We now start to learn predictions for the new building; in this case, TD updates would allow us to leverage our existing knowledge of traffic patterns in order to yield more efficient updates initially as opposed to MC methods.
 
 \subsubsection{Advantages of TD Prediction Methods}
+\paragraph{Questioning TD Methodology} TD methods effectively update their estimates based in part on other estimates. They learn a guess from another guess -- i.e. they \emph{bootstrap}. Is this a good thing to do? What advantages do TD methods have over MC and DP methods? Answering these questions is not an easy task, but we develop some intuition here.
+\paragraph{Advantages of TD over MC or DP}
+\begin{itemize}
+\item TD methods have the advantage over DP methods that they do not require a model of the environment i.e. of its reward and next-state transition probabilities.
+\item TD methods can be implemented online in a natural fashion with only one time step delay, as opposed to MC methods which require the episode to terminate before updating estimate(s) (since it is only at the end of the episode that the true return is known).
+\item TD methods can be applied to continuing tasks which have no episodes at all, making them useful across a wider range of tasks when compared with MC methods. Further, some applications have extremely long episodes, so long that delaying all learning until the end of the episode is too slow.
+\item TD methods learn from each transition regardless of what subsequent actions are taken, whereas MC methods ignore or discount episodes in which experimental actions are taken (which greatly slows learning).
+\end{itemize}
+
+We might wonder whether TD is guaranteed to converge. The answer is yes! For any fixed policy $\pi$, TD(0) has been proved to converge to $v_\pi$, in the mean for a constant step-size parameter if it is sufficiently small, and with probability 1 if the step-size parameter decreases accordingly to the conditions in equation \ref{eq: conditionsrequiredtoassureconvergencewithprobabilityone}. As of this writing, it's an open research question which of TD or MC methods converge ``faster'' to the correct predictions.
+
 
 \subsubsection{Optimality of $\texttt{TD}(0)$}
 \paragraph{Batch updating} Suppose there is available only a finite amount of experience, e.g. 10 episodes or 100 time steps. A common approach with incremental learning methods is to present the experience repeatedly until the method converges upon an answer. I.e. given an approximated value function $V$, then we increment according to one of
@@ -2033,6 +2045,75 @@ for every time step $t$ at which a non-terminal state is visited, but the value 
 \paragraph{TD(0) converges determinstically to a single answer independent of   step-size parameter}
 Note that under batch updating, as long as $\alpha$ is chosen sufficiently small, then no matter its value TD(0) will converge deterministically to a single answer. This is in contrast to using a constant $\alpha$ with a MC method, which would also converge deterministically under the same conditions but to a different answer. We need to understand why these two methods produce two different answers. Let's take a look at a couple of examples first.
 
-\paragraph{Random walk under batch updating} 
+\paragraph{Random walk under batch updating}
+Consider the following \emph{Markox reward process}, which is a Markov decision process without actions.
 
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,rectangle,fill,gray!75] (l) at (-3, 0) {};
+    \node[draw,circle,scale=2/3] (a) at (-2, 0) {\scriptsize A};
+    \node[draw,circle,scale=2/3] (b) at (-1, 0) {\scriptsize B};
+    \node[draw,circle,scale=2/3] (c) at (+0, 0) {\scriptsize C};
+    \node[draw,circle,scale=2/3] (d) at (+1, 0) {\scriptsize D};
+    \node[draw,circle,scale=2/3] (e) at (+2, 0) {\scriptsize E};
+    \node[draw,rectangle,fill,gray!75] (r) at (+3, 0) {};
+    \draw[->]  (a) -- (l);
+    \draw[<->] (a) -- (b);
+    \draw[<->] (b) -- (c);
+    \draw[<->] (c) -- (d);
+    \draw[<->] (d) -- (e);
+    \draw[->]  (e) -- (r);
+    \foreach \x in {-2.5, ..., 1.5} {
+      \node at (\x, 0.25) {\scriptsize 0};
+    }
+    \node at (2.5, 0.25) {\scriptsize 1};
+  \end{tikzpicture}
+  \caption{\footnotesize In this Markov Reward Process, all episodes start in the center state $C$, then proceed either left or right exactly one state each time step with equal probability. The termination states are on the extreme left and extreme right, but notice that it is only by ending the episode by moving to the terminal right node that we incur a $+1$ reward; all other rewards are zero. Realize that the true value of a state is the probability of terminating in the right most node. It is easy to see that $v_\pi(C) = \frac{1}{2}$. For the true values of all states $A$ through $E$ that they are $\frac{1}{6}, \frac{2}{6}, \frac{3}{6}, \frac{4}{6}, \frac{5}{6}$ respectively.}
+\end{figure}
+
+Let's now consider batch-updating versions of TD(0) and constant-$\alpha$ MC as applied to the above problem. After each new episode, all episodes seen so far are treated as a batch and they are then repeatedly presented to the prediction algorithm (one of TD(0) or constant-$\alpha$ MC). We choose $\alpha$ sufficiently small so that we are guaranteed to converge to the value function $v_\pi$. Since we can work out the value of each state analytically, we know what the true answer is for each state-value and we can compare the average root mean-squared error across the five states when running the respective learning algorithms across 100 independent repetitions of the experiment. It can be seen that the RMS error is significantly less for the TD(0) method when compared with constant-$\alpha$ MC across all episodes. Under batch training, constant-$\alpha$ MC converges to values $V(s)$ that are sample averages of the actual returns experienced after visiting each state $s$. From statistics, we know that the sample average minimizes mean squared error at least on our training set, and it is in this sense surprising that TD(0) can outperform constant-$\alpha$ when using RMS-error as the measuring stick. It turns out that MC method is optimal only in a limited way, and that the TD method is optimal in a way that is more relevant to predicting returns.
+
+\paragraph{You are the Predictor} Suppose you observe the following eight episodes for an unknown Markov reward process:
+
+\begin{table}[h]
+  \centering
+    \begin{tabular}{l l}
+    A, 0, B, 0 & B, 1 \\
+    B, 1 & B, 1 \\
+    B, 1 & B, 1 \\
+    B, 1 & B, 0 \\
+  \end{tabular}
+\end{table}
+
+The way to read this is that the first episode started in state $A$, transitioned to $B$ with a reward of zero, then terminated from $B$ with a reweard of zero. The next seven episodes start from $B$ and terminate immediately, with six of them earning unit reward and the last earning zero reward. Given this batch of data, it is reasonable to assert that $V(B) = \frac{3}{4}$, since the state $B$ was encountered in all eight episodes and six out of these times we incurred unit reward. What is more controversial is the state value of $V(A)$, given this data. ONe answer is that 100\% of the time that the process was in state $A$, it traversed to state $B$, albeit with an immediate reward of zero, but because state $B$ has value $\frac{3}{4}$ then so should state $A$ (we are not discounting, the task is episodic). One way to view this answer is according to the following diagram
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle] (a) at (0,0) {A};
+    \node[draw,circle] (b) at (2,0) {B};
+    \node[draw,rectangle,fill,gray!75] (r1) at (4, 1) {};
+    \node[draw,rectangle,fill,gray!75] (r0) at (4,-1) {};
+    \draw[->] (a) -- (b);
+    \draw[->] (b) -- (r1);
+    \draw[->] (b) -- (r0);
+    \node at (1, 0.25) {$\scriptstyle r=0$};
+    \node at (1,-0.25) {$\scriptstyle 100\%$};
+    \node at (2.75, 0.75) {$\scriptstyle r=1$};
+    \node at (3, 0.25) {$\scriptstyle 75\%$};
+    \node at (3.0,-0.25) {$\scriptstyle r=0$};
+    \node at (3.0,-0.75) {$\scriptstyle 25\%$};
+  \end{tikzpicture}
+\end{figure}
+
+If we compute the correct estimates given this model, indeed it is the case that $V(A) = \frac{3}{4}$, and this is the answer that TD(0) yields. However, there is another reasonable answer! And that is to observe that we have only observed state $A$ once and the return that followed it was zero; we therefore could estimate that $V(A) = 0$. This is the answer that batch MC gives. Realize that this answer gives the minimum mean-squared error on the training data, but we would intuitively expect that the TD(0) answer is better.
+
+\paragraph{Batch MC as minimizing MSE, TD(0) as maximizing likelihood}
+Batch MC methods find estimates that minimize the mean-squared error on the training data set. On the other hand, TD(0) always finds the estimates that would be correct for the maximum likelihood model of the Markov process, i.e. the estimate whose probability of generating the data is greatest.
+
+\paragraph{Certainty-equivalence estimate} For our example above ``You are the Predictor'', the MLE es the model of the Markov process formed in the obvious way from the observed episodes: the estimated transition probability from state $i$ to state $j$ is the fraction of observed transitions that went from $i$ to $j$, and the associated expected reward is the average of the rewards observed on those transitions. Given this model, we can compute the estimate of the value function that would be exactly correct if the model were exactly correct; this is known as the \emph{certainty-equivalence estimate} because it is equivalent
+to assuming that the estimate of the underlying process was known with certainty rather than being approximated. In general, batch TD(0) converges to the certainty-equivalence estimate.
+
+\paragraph{Computing certainty-equivalence estimate is not practical} Although the certainty-equivalence estimate is in some sense an optimal solution, it is not feasible to compute directly. Denote by $ n = |\mathcal S|$ the number of states, then simply forming the MLE requires $O(n^2)$ memory, and computing the corresponding value function requires $O(n^3)$ work. It is in this sense quite striking that TD methods can approximate the same solution using memory requirements bounded above by $O(n)$ and with repeated computations over the training set. On tasks with large state spaces, TD methods may be the only viable way of approximating the certainty-equivalence function.
 \end{document}
