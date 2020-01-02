@@ -1927,7 +1927,7 @@ Rather than use a model to compute the value of each state, MC methods simply av
 It's interesting to note that these two differences are not tightly linked, and can be de-coupled. In the next section, we will learn about methods that learn from experience, similar to MC, but also bootstrap, similar to DP.
 
 \subsection{Temporal Difference Learning}
-\emph{Temporal Difference} (TD) methods are a combination of Monte Carlo (MC) and Dynamic Programming (DP). Like MC methods, TD methods can learn directly from raw experience without a model of the environment's dynamics. Like DP, TD methods update estimates based in part on other learned estimates, without waiting for a final outcome, i.e. they bootstrap.
+\emph{Temporal Difference} (TD) methods are a combination of Monte Carlo (MC) and Dynamic Programming (DP). Like MC methods, TD methods can learn directly from raw experience without a model of the environment's dynamics. Like DP, TD methods update estimates based in part on other learned estimates, without waiting for a final outcome, i.e. they bootstrap; the combination is more powerful than the sum of its parts.
 \subsubsection{TD Prediction}
 TD and MC methods use experience to solve the prediction problem. Given some experience following a policy $\pi$, both methods update their estimate $V$ of $v_\pi$ for non-terminal states $S_t$ occurring in that experience. Roughly speaking, MC methods wait until the return following the visit is known, then use that return as a target for $V(S_t)$; this happens at the end of an episode. 
 \paragraph{Constant $\alpha$-MC}
@@ -1935,14 +1935,25 @@ A simple every-visit MC method appropriate for non-stationary environments is gi
 \[
   V(S_t) \gets V(S_t) + \alpha \left[ G_t - V(S_t)\right],
 \]
-where here $G_t$ is the actual return following time $t$, and $\alpha$ is a constant step-size parameter. We call this method constant-$\alpha$ MC.
+where here $G_t$ is the actual return following time $t$, and $\alpha$ is a constant step-size parameter. We call this method constant-$\alpha$ MC. Realize that this incremental update uses a constant step size, and that we can form a Monte Carlo estimate without saving lists of returns. However, also not that the update rule depends on $G_t$ and therefore we have to take a sample of full trajectories; this means that we don't learn \emph{during} an episode. To learn incrementally before the end of an episode, we need a new strategy.
+
 \paragraph{One-step TD}
-Whereas a constant-$\alpha$ MC requires we wait until the end of the episode to determine the increment to $V(S_t)$, in contrast TD methods need only wait until the next time step. At time $t+1$ they immediately form a target and make a useful update using the observed reward $R_{t+1}$ and the estimate $V(S_{t+1})$. The simplest TD method makes the update
+Whereas a constant-$\alpha$ MC requires we wait until the end of the episode to determine the increment to $V(S_t)$, in contrast TD methods need only wait until the next time step. At time $t+1$ they immediately form a target and make a useful update using the observed reward $R_{t+1}$ and the estimate $V(S_{t+1})$.
+We've seen how we can define returns recursively:
+\[
+  G_t \coloneqq R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \ldots = R_{t+1} + \gamma G_{t+1}
+\]
+and if we substitute this expression into our value-function for a state, we end up with a new update rule.
+\[
+  v_\pi(s) \coloneqq \mathbb E_\pi \left[ G_t | S_t = s \right] = \mathbb E_\pi \left[ R_{t+1} + \gamma G_{t+1} | S_t = s \right] = R_{t+1} + \gamma v_\pi(S_{t+1})
+\]
+This gives us a recursive expression for the value function; the simplest TD method makes the update
 \begin{equation}
   \label{eq: simplesttdupdate}
   V(S_t) \gets V(S_t) + \alpha \left[ R_{t+1} + \gamma V(S_{t+1}) - V(S_t)\right]
 \end{equation}
-immediately upon transition to $S_{t+1}$ and receiving $R_{t+1}$. In effect, the target for the MC update is $G_t$ whereas the target for the TD update is $R_{t+1} + \gamma V(S_{t+1})$. The method we've outlined here is referred to as TD(0) or one-step TD, and it is a special case of a family of algorithms called $TD(\lambda)$ and $n$-step TD.
+immediately upon transition to $S_{t+1}$ and receiving $R_{t+1}$. We can think of $\gamma V(S_{t+1})$ as an approximation for the return we would get if we waited until the end of the episode. In effect, the target for the MC update is $G_t$ whereas the target for the TD update is $R_{t+1} + \gamma V(S_{t+1})$. The method we've outlined here is referred to as TD(0) or one-step TD, and it is a special case of a family of algorithms called $TD(\lambda)$ and $n$-step TD.
+
 \begin{algorithm}[h]
   \caption{Tabular TD(0) for estimating $v_\pi$}
   \KwInput{The policy $\pi$ to be evaluated; step size $\alpha \in (0, 1]$}
@@ -1957,7 +1968,10 @@ immediately upon transition to $S_{t+1}$ and receiving $R_{t+1}$. In effect, the
   }
 }
 \end{algorithm}
+
+\paragraph{How TD(0) combines sampling of MC with bootstrapping of DP}
 Realize that TD(0) bases its updates in part on an existing estimate, therefore we say that it is a bootstrapping method, similar to DP. Recall from before that
+
 \begin{align}
   \label{eq: mcupdatetarget}
   v_\pi(s) &\coloneqq \mathbb E_\pi \left[G_t | S_t = s \right] \\
@@ -1965,6 +1979,7 @@ Realize that TD(0) bases its updates in part on an existing estimate, therefore 
   \label{eq: dpupdatetarget}
            &= \mathbb E_\pi \left[ R_{t+1} + \gamma v_\pi(S_{t+1}) | S_t = s \right]
 \end{align}
+
 Roughly speaking, MC methods use an estimate of \ref{eq: mcupdatetarget} as a target, whereas DP methods use as estimate of \ref{eq: dpupdatetarget} as a target. To be clear, the MC target is an \emph{estimate} because the population expectation is unknown, and in place of this we use a sample average of returns. The DP target is also an \emph{estimate}, where in this case we know the environment dynamics and so the expectation is well defined and available to compute, but instead it's an estimate because $v_\pi(S_{t+1})$ is not known and instead we use $V(S_{t+1})$. Finally, the TD target is an estimate for both reasons: it samples the expected returns as seen in equation \ref{eq: dpupdatetarget} \emph{and} it uses the current estimate of $V$ instead of the true $v_\pi$. This is how TD combines the sampling of MC with the bootstrapping of DP.
 
 \begin{figure}[h]
@@ -1980,12 +1995,19 @@ Roughly speaking, MC methods use an estimate of \ref{eq: mcupdatetarget} as a ta
   \caption{\footnotesize Here we show the backup diagram for tabular TD(0). The value estimate for the root note is updated on the basis of one sample transition from it to the immediately following state. We refer to TD and MC updates as \emph{sample updates} because they involve looking ahead to a sample successor state (or state-action pair), using the value of the successor and the reward along the way to compue a backed-up value, and then updating the value of the original state (or state-action pair) accordingly. On the other hand, DP updates are \emph{expected} in the sense that they are based on a complete distribution of all possible successors.}
 \end{figure}
 
+\paragraph{Emphasizing differences between DP and TD}
+In DP, we use an expectation over all possible next states, and this expectation requires a model of the environment. In TD, we only need the next state, and we can get that directly from the environment without a model.
+
 \paragraph{TD error}
 Finally, realize that the expression $\left[R + \gamma V(S') - V(s) \right]$ is sort of an error, measuring the difference between the estimated value of $S_t$ and the better estimate $R_{t+1} + \gamma V(S_{t+1})$. This quantity is called the \emph{TD error}, and it arises in various forms in reinforcement learning:
 \begin{equation}
   \delta_t = R_{t+1} + \gamma V(S_{t+1}) - V(S_t).
 \end{equation}
 Observe that the TD error at each time step is the error in the estimate \emph{made at that time}, but in order to compute it realize that it depends on the next state and next reward, so it's not actually available until one time step later. I.e. $\delta_t$ is the error in $V(S_t)$ and it is available to us at time step $t+1$.
+
+\paragraph{Rich Sutton on the importance of TD learning}
+TD learning is specialized toward prediction learning, which makes it perhaps the most important thing for AI of this century.  Prediction learning is scalable because it's effectively unsupervised supervised learning, i.e. we have a target (just by waiting) yet no human labeling is needed! Therefore, prediction learning is scalable model-free learning; we don't even need things like objective functions. TD is a kind of learning that's specialized for learning to predict: as time passes by we make a sequence of predictions and after enough time passes we learn what the correct answer was for all of those predictions. TD learning can be thought of as supervised learning where we backpropagate the error. We might question why we can't simply wait until the target is known and then use a one step method, e.g. wait until the end of the game and then regress to the outcome. In reality, there are significant computational costs to this: memory scales with the \# of steps in the prediction, and computation is poorly distributed over time. We can avoid these pitfalls if we're willing to use learning methods that are specialized for multi-step, but sometimes it's also the case that the target is never known e.g. off-policy learning. These aren't nuissances that come up by chance, they are \emph{clues} or hints from nature as to how AI really works.
+
 \paragraph{An identity: MC error as a sum of TD errors}
 If during the execution of our algorithm it is the case that the array $V$ does not change during the episode (similar to how it doesn't change in MC methods), then the MC error can be written as a sum of TD errors:
 \begin{align}
@@ -1997,7 +2019,8 @@ If during the execution of our algorithm it is the case that the array $V$ does 
 \end{align}
 Of course, this identity is not exact if $V$ gets updated during the episode, like it does in TD(0), but if the step size is small enough this identity approximately holds. Generalizations of this identity play an important role in the theory of RL.
 \paragraph{Example: driving home}
-Suppose that each day you leave from work, you try to predict how long it will take to get home. When you leave your office, you note the time, the day of week, the weather, and anything else that might be relevant. Along a single journey home, you might observe the following states alongside predictions of when we think we'll arrive at home.
+Suppose that each day you leave from work, you try to predict how long it will take to get home. When you leave your office, you note the time, the day of week, the weather, and anything else that might be relevant. You have a good estimate of how long it takes to get home from various situations you might encounter along the way. Along a single journey home, you might observe the following states alongside predictions of when we think we'll arrive at home.
+
 \begin{table}[h]
   \centering
   \begin{tabular}{l c c c}
@@ -2013,8 +2036,11 @@ Suppose that each day you leave from work, you try to predict how long it will t
   \end{tabular}
   \caption{\footnotesize The rewards in this example are the elapsed times on each leg of the journey; if we wished to minimize travel time we'd use the negative of travel times but to keep things simple let's stick with positive valued rewards. We are not discounting, since our task is episodic (each time we arrive home, the episode terminates), so $\gamma = 1$, and thus the return for each state is simply the actual time to go from that state home. It follows that the value of each state is the \emph{expected} time to go. The second column of numbers gives the current estimated value for each state encountered.}
 \end{table}
+
 One way to view the operation of MC methods is to plot the predicted total time over the sequence. If we set $\alpha = 1$, the recommended changes in predictions as given by the constant-$\alpha$ MC method will be exactly equal to the error between the estimated value (predicted time to go) in each state and the actual return (actual time to go). E.g. when we exited the highway, we thought it would take only 15 minutes more to get home, but it in fact took 23 minutes; the error $G_t - V(S_t)$ at this time is eight minutes, and so if we had a step size of $\alpha = 1/2$ the predicted time to go after exiting the highway would be revised upward by four minutes as a result of experiencing this episode! The critical part, however, is to realize that this update can only be made once you get home, at least that's what the MC method suggests; it is only at this point that you know any of the actual returns.
-On the other hand, is it really necessary to wait until the final outcome is known before learning can begin?  Perhaps if we get stuck in traffic along our way home, we can increase our estimate for our initial state before waiting to actually get home. The TD approach suggests that each error is proportional to the change over time of the prediction, i.e. to the \emph{temporal differences} in predictions.
+On the other hand, is it really necessary to wait until the final outcome is known before learning can begin?  Perhaps if we get stuck in traffic along our way home, we can increase our estimate for our initial state before waiting to actually get home.
+It's easy to see how it works when $\alpha = 1$, in this case the terms $V(S_t)$ on the right hand side of the TD(0) update rule cancel and our update reduces to $V(S_t) \gets R_{t+1} + \gamma V(S_{t+1})$, where here $\gamma = 1$ since our task is episodic. So, our update rule with $\alpha = 1$ is to simply add our commute time between states (or legs of our journey) to our best estimate for how long it would take to get home from the next state; as we make our way home, we can learn online without waiting to know the final outcome.
+The TD approach suggests that each error is proportional to the change over time of the prediction, i.e. to the \emph{temporal differences} in predictions.
 
 \paragraph{TD and generalization: a scenario where TD update is better on average than an MC update} Suppose you have lots of experience driving home from work. Then, you move to a new building and a new parking lot, but you still enter the highway at the same place! We now start to learn predictions for the new building; in this case, TD updates would allow us to leverage our existing knowledge of traffic patterns in order to yield more efficient updates initially as opposed to MC methods.
 
@@ -2045,8 +2071,8 @@ for every time step $t$ at which a non-terminal state is visited, but the value 
 \paragraph{TD(0) converges determinstically to a single answer independent of   step-size parameter}
 Note that under batch updating, as long as $\alpha$ is chosen sufficiently small, then no matter its value TD(0) will converge deterministically to a single answer. This is in contrast to using a constant $\alpha$ with a MC method, which would also converge deterministically under the same conditions but to a different answer. We need to understand why these two methods produce two different answers. Let's take a look at a couple of examples first.
 
-\paragraph{Random walk under batch updating}
-Consider the following \emph{Markox reward process}, which is a Markov decision process without actions.
+\paragraph{Random walk}
+Consider the following \emph{Markox reward process} depicted in figure \ref{fig: mrprandomwalk}, which is a Markov decision process without actions. Let's compare and contrast TD(0) updates with MC updates. Suppose we initialize all state-values with value $1/2$ initially. On the first episode, the agent hops around states C, D, and E before eventually hitting the right most terminating state and picking up a positive unit-valued reward. Since the episode has ended, the MC method can update the state-values for states C, D, and E (i.e. all the states that were encountered along the last journey), whereas it is interesting to note that the TD(0) method would \emph{only} have updated the state-value for state E. To see this, consider the first transition from C to D. The TD error is equal to the reward on the transition plus the value of the next state D minus the value of state C: the reward is zero because this is a non-terminal transition, and the values of both C and D are $1/2$, and so the TD error is zero and we make no change to the estimate for state C. The same thing happens on every time step except the transition to the terminal state from state E. If we allow our agent to experience more episodes, eventually the TD agent akes updates to the values on \emph{every} step, whereas in contrast the MC method requires the agent reach the end of the episode before making any updates.
 
 \begin{figure}[h]
   \centering
@@ -2070,8 +2096,10 @@ Consider the following \emph{Markox reward process}, which is a Markov decision 
     \node at (2.5, 0.25) {\scriptsize 1};
   \end{tikzpicture}
   \caption{\footnotesize In this Markov Reward Process, all episodes start in the center state $C$, then proceed either left or right exactly one state each time step with equal probability. The termination states are on the extreme left and extreme right, but notice that it is only by ending the episode by moving to the terminal right node that we incur a $+1$ reward; all other rewards are zero. Realize that the true value of a state is the probability of terminating in the right most node. It is easy to see that $v_\pi(C) = \frac{1}{2}$. For the true values of all states $A$ through $E$ that they are $\frac{1}{6}, \frac{2}{6}, \frac{3}{6}, \frac{4}{6}, \frac{5}{6}$ respectively.}
+\label{fig: mrprandomwalk}
 \end{figure}
 
+\paragraph{Random walk under batch updating}
 Let's now consider batch-updating versions of TD(0) and constant-$\alpha$ MC as applied to the above problem. After each new episode, all episodes seen so far are treated as a batch and they are then repeatedly presented to the prediction algorithm (one of TD(0) or constant-$\alpha$ MC). We choose $\alpha$ sufficiently small so that we are guaranteed to converge to the value function $v_\pi$. Since we can work out the value of each state analytically, we know what the true answer is for each state-value and we can compare the average root mean-squared error across the five states when running the respective learning algorithms across 100 independent repetitions of the experiment. It can be seen that the RMS error is significantly less for the TD(0) method when compared with constant-$\alpha$ MC across all episodes. Under batch training, constant-$\alpha$ MC converges to values $V(s)$ that are sample averages of the actual returns experienced after visiting each state $s$. From statistics, we know that the sample average minimizes mean squared error at least on our training set, and it is in this sense surprising that TD(0) can outperform constant-$\alpha$ when using RMS-error as the measuring stick. It turns out that MC method is optimal only in a limited way, and that the TD method is optimal in a way that is more relevant to predicting returns.
 
 \paragraph{You are the Predictor} Suppose you observe the following eight episodes for an unknown Markov reward process:
