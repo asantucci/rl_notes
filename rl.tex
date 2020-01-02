@@ -2144,4 +2144,152 @@ Batch MC methods find estimates that minimize the mean-squared error on the trai
 to assuming that the estimate of the underlying process was known with certainty rather than being approximated. In general, batch TD(0) converges to the certainty-equivalence estimate.
 
 \paragraph{Computing certainty-equivalence estimate is not practical} Although the certainty-equivalence estimate is in some sense an optimal solution, it is not feasible to compute directly. Denote by $ n = |\mathcal S|$ the number of states, then simply forming the MLE requires $O(n^2)$ memory, and computing the corresponding value function requires $O(n^3)$ work. It is in this sense quite striking that TD methods can approximate the same solution using memory requirements bounded above by $O(n)$ and with repeated computations over the training set. On tasks with large state spaces, TD methods may be the only viable way of approximating the certainty-equivalence function.
+
+\subsubsection{Sarsa: On-policy TD Control}
+The first step in using GPI with TD methods for the control method is to learn an action-value function rather than a state value function. We must estimate $q_\pi(s,a)$ for the current behavior policy $\pi$ and for all states $s$ and actions $a$. Recall that an episode consists of alternating sequences of states and state-action pairs:
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle] (st) at (0, 0) {$S_{t}$};
+    \node[draw,circle,scale=1/4,fill] (at) at (1.5, 0) {};
+    \foreach \x in {1, 2, 3} {
+      \node[draw,circle,scale=3/4] (s\x) at (\x*3, 0) {$S_{t+\x}$};
+      \node[draw,circle,scale=1/4,fill] (a\x) at (\x*3 + 1.5, 0) {};
+    }
+    \node (leftdots) at (-2, 0) {$\ldots$};
+    \draw (leftdots) -- (st);
+    \draw (st) -- (at);
+    \draw (at) -- (s1);
+    \draw (s1) -- (a1);
+    \draw (a1) -- (s2);
+    \draw (s2) -- (a2);
+    \draw (a2) -- (s3);
+    \draw (s3) -- (a3);
+    \node[above right = 1pt of at] {$R_{t+1}$};
+    \node[below  left = 1pt of at] {$A_{t}$};
+    \node[above right = 1pt of a1] {$R_{t+2}$};
+    \node[below  left = 1pt of a1] {$A_{t+1}$};
+    \node[above right = 1pt of a2] {$R_{t+3}$};
+    \node[below  left = 1pt of a2] {$A_{t+2}$};
+    \node[below  left = 1pt of a3] {$A_{t+3}$};
+    \node[right = 1mm of a3] {$\ldots$};
+  \end{tikzpicture}
+  \caption{\footnotesize Whereas we previously considered transitions from state to state and learned the values of states, we now consider transitions from state-action pair to state-action pair, and we learn the values of state-action pairs. Mathematically, the same theorems assuring convergence of state values under TD(0) also apply to the corresponding algorithm for action-values.}
+\end{figure}
+
+Our update becomes:
+\begin{equation}
+  \label{eq: sarsa}
+  Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha \left[R_{t+1} + \gamma Q(S_{t+1}, A_{t+1}) - Q(S_t, A_t)\right].
+\end{equation}
+We perform this update for each transition from a nonterminal state $S_t$, and if $S_{t+1}$ is terminal then we define $Q(S_{t+1}, A_{t+1}) = 0$. Since each updates involves the quintuple of events, $(S_t, A_t, R_{t+1}, S_{t+1}, A_{t+1})$, that make up a transition from one state-action pair to the next we call this method \emph{Sarsa}.
+
+\paragraph{On-policy control method}
+We can easily design an on-policy control algorithm based on the Sarsa prediction method: we continually estimate $q_\pi$ for the behavior policy $\pi$ and at the same time make $\pi$ greedy with respect to $q_\pi$. The convergence properties of the algorithm depend on the nature of the policies dependence on $Q$, e.g. we could use $\epsilon$-greedy or $\epsilon$-soft policies. Sarsa converges almost surely to an optimal policy and action-value function so long as all state-action pairs are visited infinitely many times, and the policy converges asymptotically to the greedy policy; one idea is to set $\epsilon = 1/t$ so that in the limit we recover an optimal policy.
+
+\begin{algorithm}[h]
+  \caption{Sarsa (on-policy TD control) for estimating $Q \approx q_*$}
+  Initialize $Q(s,a)$ for all $s \in \mathcal S^+$, $a \in \mathcal A(s)$,   arbitrarily except that $Q(\texttt{terminal}, \cdot) = 0$.
+\For{each episode} {
+  Initialize $S$ \\
+  Choose $A$ from $S$ using policy derived from $Q$ (e.g. $\epsilon$-greedy) \\
+  \For{each step in the episode, until state $S$ is terminal} {
+    Take action $A$, observe $R, S'$ \\
+    Choose $A'$ from $S'$ using policy derived from $Q$ (e.g. $\epsilon$-greedy)         \\
+    $Q(S, A) \gets Q(S, A) + \alpha \left[R + \gamma Q(S', A') - Q(S, A)\right]$     \\
+    $S \gets S'$; $A \gets A'$;
+  }
+}
+\end{algorithm}
+
+\subsubsection{Q-learning: Off-policy TD Control}
+This algorithm was one of the early breakthroughs in RL, defined by the update rule
+\begin{equation}
+  \label{eq: qlearningupdaterule}
+  Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha \left[R_{t+1} + \gamma \max_a Q(S_{t+1}, a) - Q(S_t, A_t)\right].
+\end{equation}
+We call the learned action-value function $Q$ and it is meant to directly approximate $q_*$, the optimal action-value function, independent of the policy being followed. All that is required for correct convergence is that all state-action pairs continue to be \emph{updated}. Under this assumption of continual updating and a variant of the usual stochastic approximation conditions on the sequence of the step-size parameters, $Q$ learning converges almost surely to $q_*$. The $Q$-learning algorithm is presented here.
+\begin{algorithm}[h]
+  \caption{Q-learning (off-policy TD control) for estimating $\pi \approx \pi_*$}
+  \KwInput{Step size $\alpha \in (0, 1]$, and a small $\epsilon > 0$.}
+  Initialize $Q(s,a)$ for all $s \in \mathcal S^+$, $a \in \mathcal A(s)$,   arbitrarily except that $Q(\texttt{terminal}, \cdot) = 0$ \\
+\For{each episode} {
+  Initialize $S$
+  \For{each step of the episode, until $S$ is terminal} {
+    Choose $A$ from $S$ using policy derived from $Q$ (e.g. $\epsilon$-greedy)     \\
+Take action $A$, observe $R$, $S'$ \\
+    $Q(S,A) \gets Q(S,A) + \alpha \left[R + \gamma \max_a Q(S', a) -       Q(S,A)\right]$ \\
+    $S \gets S'$
+  }
+}
+\end{algorithm}
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle,fill,scale=1/2] (root) at (0, 0) {};
+    \node[draw,circle,scale=3/4] (state) at (0, -1) {};
+    \draw[->] (root) -- (state);
+    \foreach \x in {-1, 0, 1} {
+      \node[draw,circle,fill,scale=1/2] (a\x) at (\x, -2) {};
+      \draw[->] (state) -- (a\x);
+    }
+    \path (-0.5, -1.5) edge[bend right] (0.5, -1.5);
+  \end{tikzpicture}
+  \caption{\footnotesize Realize that our update rule \ref{eq: qlearningupdaterule} updates a state-action pair, and so if we were to inspect a backup diagram for this procedure the root node would be a small, filled action node. The update is also \emph{from} action nodes, maximizing over all possible actions in the next state transition. Thus, the bottom nodes of the backup diagram should be of all these possible action nodes. We may indicate the maximum over these actions by using an arc across them.}
+\end{figure}
+
+\paragraph{Cliff walking example} We can compare Sarsa with Q-learning on a modified gridworld example.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \draw (0, 0) grid (12, 4);
+    \draw[fill,gray!50] (1, 0) rectangle (11, 1);
+    \node at (6, 0.5) {The Cliff};
+    \node (beg) at (0.5, 0.5) {S};
+    \node (end) at (11.5, 0.5) {G};
+    \path[draw,purple,thick,->] (0.75, 0.5) -- (0.75, 1.5) -- (11.25, 1.5) -- (11.25, 0.5);
+    \path[draw,orange,thick,->] (0.25, 0.5) -- (0.25, 3.5) -- (11.75, 3.5) --     (11.75, 0.5);
+\node at (-1.5, 1.25) {\color{purple} Optimal path};
+\node at (-1.5, 3.5)  {\color{orange} Safer path};
+\node at (6, 4.25) {$R=-1$};
+\path[->,thick,green!50!blue!50] (1.5,0) edge[bend left=90] (0.7, 0);
+\path[->,thick,green!50!blue!50] (2.5,0) edge[bend left=80] (0.6, 0);
+\node at (3.5,-0.25) {$\color{green!50!blue!50} \bullet \bullet \bullet$};
+\path[->,thick,green!50!blue!50] (4.5,0) edge[bend left=70] (0.5, 0);
+\node at (5.5,-0.25) {$\color{green!50!blue!50} \bullet \bullet \bullet$};
+\node at (8.5,-0.25) {$\color{green!50!blue!50} R = -100$};
+\path[->,thick,green!50!blue!50] (10.5,0) edge[bend left=60] (0.4, 0);
+\end{tikzpicture}
+\caption{\footnotesize We have a standard undiscounted episodic task with start and goal states and four actions causing movement up, down, left, and right. The reward is $-1$ on all transitions except into the region marked ``The Cliff'', in which case the agent incurs a reward of -100 and is reset back to the start (note the episode is not yet terminated, in this case). A Sarsa algorithm can be compared against a Q-learning algorithm with an $\epsilon$-greedy action selection setting $\epsilon=0.1$. It happens to be that Sarsa learns the safer path and earns a higher sum of rewards during the episode, whereas on the other hand Q-learning is able to recover the optimal path however its exploration strategy forces it to sometimes veer off into the cliff causing it to earn less return over the long run when compared with Sarsa. It's noteworthy that if $\epsilon$ were gradually reduced, then both methods would asymptotically converge to the optimal policy.}
+\end{figure}
+\subsubsection{Expected Sarsa}
+We could consider making one modification to Q-learning: instead of taking the maximum over next state-action pairs we could instead use the expected value, taking into account how likely each action is under the current policy. Such an update rule would look like
+\begin{align}
+  Q(S_t, A_t) &\gets Q(S_t, A_t) + \alpha \left[R_{t+1} + \gamma \mathbb E_\pi \left[Q(S_{t+1},A_{t+1}) | S_{t+1}\right] - Q(S_t,                 A_t)\right] \nonumber \\
+  &\gets Q(S_t, A_t) + \alpha \left[R_{t+1} + \gamma \sum_a \pi(a|S_{t+1}) Q(S_{t+1},a) - Q(S_t, A_t)\right].
+\end{align}
+With exception to the modification of the update rule, we follow the schema of Q-learning. Given a next state $S_{t+1}$, this algorithm moves \emph{deterministically} in the same direction as Sarsa moves \emph{in   expectation}, whence its name.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,circle,fill,scale=1/2] (root) at (0, 0) {};
+    \node[draw,circle,scale=3/4] (state) at (0, -1) {};
+    \draw[->] (root) -- (state);
+    \foreach \x in {-1, 0, 1} {
+      \node[draw,circle,fill,scale=1/2] (a\x) at (\x, -2) {};
+      \draw[->] (state) -- (a\x);
+    }
+  \end{tikzpicture}
+  \caption{\footnotesize Expected Sarsa backup diagram.}
+\end{figure}
+
+\paragraph{Computational cost of Expected Sarsa} Realize that Expected Sarsa is more computationally complex than Sarsa, but, in return we eliminate the variance due to the \emph{random} selection of $A_{t+1}$. In general, given the same amount of experience as Sarsa it generally outperforms Sarsa.
+
+\paragraph{Relating Expected Sarsa with Q-learning} We introduced Expected Sarsa as an on-policy algorithm, but in general it might usse a different policy from the target policy $\pi$ to generate behavior. In such cases, it becomes an off-policy algorithm. We could take $\pi$ to be the greedy policy and a behavior policy that is more exploratory, for example; in this case, Expected Sarsa is exactly Q-learning. It is in this sense that Expected Sarsa subsumes and generalizes Q-learning while reliably improving over Sarsa. Its true the Expected Sarsa incurs a higher computational expense, but it in general dominates both of the other well-known TD control algorithms.
+
+\subsubsection{Summary of TD}
 \end{document}
