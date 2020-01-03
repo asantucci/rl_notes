@@ -2346,7 +2346,24 @@ This effectively means that Q-learning can directly learn $q_*$ instead of switc
   \caption{\footnotesize Realize that our update rule \ref{eq: qlearningupdaterule} updates a state-action pair, and so if we were to inspect a backup diagram for this procedure the root node would be a small, filled action node. The update is also \emph{from} action nodes, maximizing over all possible actions in the next state transition. Thus, the bottom nodes of the backup diagram should be of all these possible action nodes. We may indicate the maximum over these actions by using an arc across them.}
 \end{figure}
 
-\paragraph{Cliff walking example} We can compare Sarsa with Q-learning on a modified gridworld example.
+\paragraph{Comparing the variance of our target in Sarsa vs. Q-learning}
+Q-learning takes the max over next action values, and so it only changes its action-value function when the agent learns that one action is better than another. In contrast, Sarsa uses the estimate of the next action value in its target, which changes every time the agent takes an exploratory action.
+
+\paragraph{How is Q-learning considered off-policy?}
+So far, all off-policy algorithms we've presented use importance sampling. How can Q-learning be off-policy without using importance sampling? Recall that an agent estimates its value function according to the expected returns under their target policy, but they actually behave according to their target policy. When the target and behavior policy are the same, the agent is learning on-policy, otherwise the agent is learning off-policy. Sarsa is an on-policy algorithm, because the agent bootstraps off of the value of the action it's going to take next, which is sampled from its behavior policy!
+\[
+Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha   \left(R_{t+1} + \gamma Q(S_{t+1}, \underbrace{A_{t+1}}_{\sim \pi}) - Q(S_t, A_t)\right)  
+\]
+On the other hand, Q-learning bootstrapps off of the largest action-value in the next state, which is like sampling an action under an estimate of the optimal policy \emph{rather} than the behavior policy.
+\[
+Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha   \left(R_{t+1} + \gamma {\color{purple} \max_{a'}} Q(S_{t+1}, {\color{purple}a'}) - Q(S_t, A_t)\right)
+\]
+Since Q-learning learns about the best action it could possibly take rather than the actions it actually takes, it is learning off-policy. Q-learning's target policy is always greedy with respect to its current values. However, its behavior policy can be anything that continues to visit all state-action pairs during learning; one possible behavior policy is $\epsilon$-greedy. The difference here between the target and behavior policies confirms that Q-learning is greedy.
+
+\paragraph{Why are there no importance sampling ratios in Q-learning?}
+Since the agent is estimating action values with a known policy, it does not need importance sampling ratios to correct for the difference in action selection. The action-value function represents the returns following each action in a given state, and the agent's target policy represents the probability of taking each action in a given state. Putting these two elements together, the agent can calculate the expected return under its target policy from any given state, in particular, the next state $S_{t+1}$. Since the agent's target policy is greedy with respect to its action values, all non-maximum actions have probability zero. As a result, the expected return from that state is equal to a maximal action value from that state. 
+
+\paragraph{Cliff walking example} We can compare Sarsa with Q-learning on a modified gridworld example, as shown in figure \ref{fig: cliffgridworld}.
 
 \begin{figure}[h]
   \centering
@@ -2369,14 +2386,33 @@ This effectively means that Q-learning can directly learn $q_*$ instead of switc
 \node at (8.5,-0.25) {$\color{green!50!blue!50} R = -100$};
 \path[->,thick,green!50!blue!50] (10.5,0) edge[bend left=60] (0.4, 0);
 \end{tikzpicture}
-\caption{\footnotesize We have a standard undiscounted episodic task with start and goal states and four actions causing movement up, down, left, and right. The reward is $-1$ on all transitions except into the region marked ``The Cliff'', in which case the agent incurs a reward of -100 and is reset back to the start (note the episode is not yet terminated, in this case). A Sarsa algorithm can be compared against a Q-learning algorithm with an $\epsilon$-greedy action selection setting $\epsilon=0.1$. It happens to be that Sarsa learns the safer path and earns a higher sum of rewards during the episode, whereas on the other hand Q-learning is able to recover the optimal path however its exploration strategy forces it to sometimes veer off into the cliff causing it to earn less return over the long run when compared with Sarsa. It's noteworthy that if $\epsilon$ were gradually reduced, then both methods would asymptotically converge to the optimal policy.}
+\caption{\footnotesize We have a standard undiscounted episodic task with start and goal states and four actions causing movement up, down, left, and right. The reward is $-1$ on all transitions except into the region marked ``The Cliff'', in which case the agent incurs a reward of -100 and is reset back to the start (note the episode is not yet terminated, in this case). A Sarsa algorithm can be compared against a Q-learning algorithm with an $\epsilon$-greedy action selection setting $\epsilon=0.1$. It happens to be that Sarsa learns the safer path and earns a higher sum of rewards during the episode, whereas on the other hand Q-learning is able to recover the optimal path however its exploration strategy forces it to sometimes veer off into the cliff causing it to earn less return over the long run when compared with Sarsa. Sarsa, on the other hand, still uses an exploration algorithm but it takes into account the effect of $\epsilon$-greedy action-selection when determining the best policy, and so that's why it learns the safest path: it protects itself from random actions that could cause it to veer toward the cliff. It's noteworthy that if $\epsilon$ were gradually reduced, then both methods would asymptotically converge to the optimal policy.}
+\label{fig: cliffgridworld}
 \end{figure}
+
 \subsubsection{Expected Sarsa}
-We could consider making one modification to Q-learning: instead of taking the maximum over next state-action pairs we could instead use the expected value, taking into account how likely each action is under the current policy. Such an update rule would look like
+\paragraph{Motivating Expected Sarsa} Recall the Bellman equation for action-values. Here we see that the expectation is over values of possible next state-action pairs. In particular, if we break the summation apart we see that there is a sum over all possible next states as well as possible next actions.
+\[
+  q_\pi(s,a) = \sum_{{\color{purple} s'}, r} \Pr(s', r| s, a) \left( r + \gamma \sum_{\color{purple} a'} \pi(a'|s') q_\pi(s',a')\right).
+\]
+Sarsa estimates this expectation by sampling the next state from the environment and the next action from its policy. I.e.
+\[
+  Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha \left( R_{t+1} + \gamma Q(\underbrace{S_{t+1}}_{\sim \Pr(s', r | s, a)}, \underbrace{A_{t+1}}_{\sim \pi(a'|s')}) - Q(S_t, A_t)\right).
+\]
+But, the agent already knows this policy $\pi(a'|s')$, why should it have to sample its next action? Instead, it should just compute the expectation directly. In this case, we can take a weighted sum of the values of all possible next-actions, where the weights are the probability of taking each action under the agent's policy. I.e. we may replace $Q(S_{t+1}, A_{t+1})$ with
+\[
+  \sum_{s'} \pi(a'|S_{t+1}) Q(S_{t+1}, a').
+\]
+This is the core idea behind Expected Sarsa: instead of taking the maximum over next state-action pairs we could instead use the expected value, taking into account how likely each action is under the current policy.
+
+\paragraph{Expected Sarsa has a more stable target than Sarsa}
+Realize that Expected Sarsa has a more stable update target than Sarsa: Sarsa realies on the fact that in expectation across multiple updates it will move in the right direction, whereas in contrast expected Sarsa's update targets are exactly correct and do not change estimated values away from the true values. I.e. Expected Sarsa target has much lower variance than Sarsa.
+Such an update rule for Expected Sarsa would look like
 \begin{align}
   Q(S_t, A_t) &\gets Q(S_t, A_t) + \alpha \left[R_{t+1} + \gamma \mathbb E_\pi \left[Q(S_{t+1},A_{t+1}) | S_{t+1}\right] - Q(S_t,                 A_t)\right] \nonumber \\
   &\gets Q(S_t, A_t) + \alpha \left[R_{t+1} + \gamma \sum_a \pi(a|S_{t+1}) Q(S_{t+1},a) - Q(S_t, A_t)\right].
 \end{align}
+With a more stable target, Expected Sarsa can take advantage of higher learning rates more effectively when compared with Sarsa. Expected Sarsa's updates are deterministic for a given state and action, whereas Sarsas updates can vary significantly depending on the next action.
 With exception to the modification of the update rule, we follow the schema of Q-learning. Given a next state $S_{t+1}$, this algorithm moves \emph{deterministically} in the same direction as Sarsa moves \emph{in   expectation}, whence its name.
 
 \begin{figure}[h]
@@ -2393,9 +2429,14 @@ With exception to the modification of the update rule, we follow the schema of Q
   \caption{\footnotesize Expected Sarsa backup diagram.}
 \end{figure}
 
-\paragraph{Computational cost of Expected Sarsa} Realize that Expected Sarsa is more computationally complex than Sarsa, but, in return we eliminate the variance due to the \emph{random} selection of $A_{t+1}$. In general, given the same amount of experience as Sarsa it generally outperforms Sarsa.
+\paragraph{Computational cost of Expected Sarsa} Realize that Expected Sarsa is more computationally complex than Sarsa, and further that computing the average over next actions becomes more expensive as the number of actions increases. But, in return we eliminate the variance due to the \emph{random} selection of $A_{t+1}$. In general, given the same amount of experience as Sarsa it generally outperforms Sarsa.
 
-\paragraph{Relating Expected Sarsa with Q-learning} We introduced Expected Sarsa as an on-policy algorithm, but in general it might usse a different policy from the target policy $\pi$ to generate behavior. In such cases, it becomes an off-policy algorithm. We could take $\pi$ to be the greedy policy and a behavior policy that is more exploratory, for example; in this case, Expected Sarsa is exactly Q-learning. It is in this sense that Expected Sarsa subsumes and generalizes Q-learning while reliably improving over Sarsa. Its true the Expected Sarsa incurs a higher computational expense, but it in general dominates both of the other well-known TD control algorithms.
+\paragraph{Relating Expected Sarsa with Q-learning} We introduced Expected Sarsa as an on-policy algorithm, i.e. in the update
+\[
+  Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha \left(R_{t+1} + \gamma {\color{purple} \sum_{a'} \pi(a'|S_{t+1})} Q(S_{t+1}, {\color{purple}a'}) - Q(S_t, A_t)\right)
+\]
+where $A_{t+1} \sim \pi(a' | S_{t+1})$, i.e. the next action is sampled from policy $\pi$. But in general it might use a different policy from the target policy $\pi$ to generate behavior, i.e. the expectation over actions is computed independently of the action actually selected in the next state. In such cases, it becomes an off-policy algorithm, and we don't even need importance sampling, since the expectation is taken over the target policy in the update target! Another interesting note is that we could take $\pi$ to be the greedy policy and a behavior policy that is more exploratory, for example; in this case, Expected Sarsa is exactly Q-learning. It is in this sense that Expected Sarsa subsumes and generalizes Q-learning while reliably improving over Sarsa. Its true the Expected Sarsa incurs a higher computational expense, but it in general dominates both of the other well-known TD control algorithms.
 
 \subsubsection{Summary of TD}
+The TD control algorithms are based on Bellman equations; we learned about three of them. Sarsa uses a sample-based version of the Bellman equation, and it learns $q_\pi$. Q-learning uses the Bellman optimality equation, whence it learns $q_*$. Expected Sarsa uses the same Bellman equation as Sarsa, but samples it differently: it takes an expectation over next action values. Whereas Sarsa is an on-policy algorithm that learns the action values for the policy its currently following, Q-learning is an off-policy algorithm that learns the optimal action values. Expected Sarsa is both an on-policy and off-policy algorithm that can learn the action values for \emph{any} policy!. Sarsa can do better than Q-learning when performance is measured online, because on-policy control methods account for their own exploration; e.g. in cliff-world we saw that Q-learning was susceptible to falling off the cliff as it attempted to maintain continual exploration whilst generally following an optimal policy right along the cliff edge. On the other hand, Sarsa learned the longer but safer path that rarely fell off the cliff, which resulted in higher returns. We can improve Sarsa using Expected Sarsa, where the latter in general outperforms the former: this is because Expected Sarsa mitigates the variance due to its own policy. Expected Sarsa takes its expectation over the next action. 
 \end{document}
