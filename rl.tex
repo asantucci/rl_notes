@@ -2146,7 +2146,62 @@ to assuming that the estimate of the underlying process was known with certainty
 \paragraph{Computing certainty-equivalence estimate is not practical} Although the certainty-equivalence estimate is in some sense an optimal solution, it is not feasible to compute directly. Denote by $ n = |\mathcal S|$ the number of states, then simply forming the MLE requires $O(n^2)$ memory, and computing the corresponding value function requires $O(n^3)$ work. It is in this sense quite striking that TD methods can approximate the same solution using memory requirements bounded above by $O(n)$ and with repeated computations over the training set. On tasks with large state spaces, TD methods may be the only viable way of approximating the certainty-equivalence function.
 
 \subsubsection{Sarsa: On-policy TD Control}
-The first step in using GPI with TD methods for the control method is to learn an action-value function rather than a state value function. We must estimate $q_\pi(s,a)$ for the current behavior policy $\pi$ and for all states $s$ and actions $a$. Recall that an episode consists of alternating sequences of states and state-action pairs:
+\paragraph{Recall Generalized Policy Iteration}
+Generalized policy iteration combines two parts: policy evaluation and policy improvement. The first algorithm we saw for this was policy iteration, which runs policy evaluation until convergence before greedifying the policy. Then, we saw GPI with Monte Carlo, which performs a cycle of policy iteration and improvement every episode. To better remember GPI with MC, we go back to a simple example, as depicted in figure \ref{fig: cheeseonaunivariategridwithamouseexample}.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    % Initial random policy
+    \draw[fill,gray!50] (0,0) rectangle (5, 1);
+    \draw (0,0) grid (5, 1);
+    \node at (-0.5, 0.5) {$\pi$};
+    \node at (4.5, 0.5) {\scriptsize Cheese};
+    \foreach \x in {0.5, ..., 3.5} {
+      \draw[->] (\x,0.5) -- (\x-0.125,0.5);
+      \draw[->] (\x,0.5) -- (\x+0.125,0.5);
+    }
+    % Updating Q(s,a)
+    \draw (0,-2) grid (5, -1);
+    \node at (-0.5, -1.5) {$\scriptstyle Q(s,a)$};
+    \node at (4.5, -1.5) {\scriptsize Cheese};
+    \foreach \x in {0.5, ..., 2.5} {
+      \draw[->] (\x,-1.5) -- (\x-0.125,-1.5);
+      \draw[->] (\x,-1.5) -- (\x+0.125,-1.5);
+    }
+    \draw[fill,purple!50] (3, -2) rectangle (4, -1);
+    \draw[->] (3.5,-1.5) -- (3.5+0.125,-1.5);
+    % Transition from policy evaluation to policy improvement
+    \draw[->,thick] (5.25, -1.5) -- (6, -1.5) -- (6, 0.5) -- (6.75, 0.5);
+    % Policy improvement
+    \draw[fill,gray!50] (8,0) rectangle (13, 1);
+    \draw (8,0) grid (13, 1);
+    \node at (7.5, 0.5) {$\pi$};
+    \node at (12.5, 0.5) {\scriptsize Cheese};
+    \foreach \x in {8.5, ...,10.5} {
+      \draw[->] (\x,0.5) -- (\x-0.125,0.5);
+      \draw[->] (\x,0.5) -- (\x+0.125,0.5);
+    }
+    \draw[->] (11.5, 0.5) -- (11.5+.125,0.5);
+    % Continual updates...
+    \node at (10.5, -0.5) {$\vdots$};
+    % Convergence to optimal policy pi^*
+    \draw[fill,gray!50] (8,-2) rectangle (13, -1);
+    \draw (8,-2) grid (13, -1);
+    \node at (7.5, -1.5) {$\pi^*$};
+    \node at (12.5, -1.5) {\scriptsize Cheese};
+    \foreach \x in {8.5, ...,11.5} {
+      \draw[->] (\x,-1.5) -- (\x+0.125,-1.5);
+    }
+  \end{tikzpicture}
+  \caption{\footnotesize Suppose that we have a four-state corridor with cheese at the end. A mouse, our agent, starts out knowing nothing and follows a random policy. Eventually, the mouse will stumble into the cheese simply by moving randomly, and it is as that point that the episode concludes, and with Monte Carlo GPI we update action values $Q(s,a)$. Then, it improves its policy by greedifying with respect to the action values. This process then repeats, eventually learning the optimal policy.}
+\label{fig: cheeseonaunivariategridwithamouseexample}
+\end{figure}
+
+Realize that GPI with MC does not perform a full policy evaluation step before improvement, but instead it evaluates and improves after each episode. If we go even further, we could choose to improve the policy after only one policy evaluation step! This is what we will do with TD control.
+
+\paragraph{Estimating the value of state-action pairs}
+The first step in using GPI with TD methods for the control method is to learn an action-value function rather than a state value function. We must estimate $q_\pi(s,a)$ for the current behavior policy $\pi$ and for all states $s$ and actions $a$. Recall that an episode consists of alternating sequences of states and state-action pairs as in figure \ref{fig: stateactionpairstransitions}. 
 
 \begin{figure}[h]
   \centering
@@ -2176,8 +2231,10 @@ The first step in using GPI with TD methods for the control method is to learn a
     \node[right = 1mm of a3] {$\ldots$};
   \end{tikzpicture}
   \caption{\footnotesize Whereas we previously considered transitions from state to state and learned the values of states, we now consider transitions from state-action pair to state-action pair, and we learn the values of state-action pairs. Mathematically, the same theorems assuring convergence of state values under TD(0) also apply to the corresponding algorithm for action-values.}
+\label{fig: stateactionpairstransitions}
 \end{figure}
 
+\paragraph{Sarsa}
 Our update becomes:
 \begin{equation}
   \label{eq: sarsa}
@@ -2202,6 +2259,34 @@ We can easily design an on-policy control algorithm based on the Sarsa predictio
   }
 }
 \end{algorithm}
+
+\paragraph{Sarsa on the Windy gridworld}
+Let's see how Sarsa behaves on an example.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[scale=3/4]
+    \draw (0, 0) grid (10, 7);
+    \node (s) at ( 0.5, 3.5 ) {S};
+    \node (g) at ( 7.5, 3.5 ) {G};
+    \foreach \x in {0.5, 1.5, 2.5} {
+      \node at (\x, -0.5) {\color{gray!80} \scriptsize 0};
+    }
+    \foreach \x in {3.5, 4.5, 5.5} {
+      \node at (\x, -0.5) {\color{gray!90} \scriptsize 1};
+    }
+    \foreach \x in {6.5, 7.5} {
+      \node at (\x, -0.5) {\scriptsize 2};
+    }
+    \node at (8.5, -0.5) {\color{gray!90} \scriptsize 1};
+    \node at (9.5, -0.5) {\color{gray!80} \scriptsize 0};
+    \draw[->,ultra thick,orange!80] (s) -- (3.5, 3.5) -- (6.5, 6.5) -- (9.5,     6.5) -- (9.5, 2.5) -- (8.5, 2.5) -- (g);
+    \draw[->, ultra thick, orange!20] (2.5, 3.5) -- (2.5, 2.5);
+    \draw[->, ultra thick, orange!20] (4.5, 4.5) -- (3.5, 5.5);
+    \draw[->, ultra thick, orange!20] (5.5, 5.5) -- (5.5, 6.5);
+    \draw[->, ultra thick, orange!20] (9.5, 4.5) -- (8.5, 4.5);
+  \end{tikzpicture}
+  \caption{\footnotesize In this episodic task, an agent seeks to learn how to get from the starting state, denoted by $S$, to the goal state, denoted by $G$. In addition to the agent being able to move left, right, up, or down, there is also an upward wind that is indicated below each column: the units indicate how many spaces upward the agent will move when taking an action from a state within a particular column. Moving into a boundary does nothing. The agent receives a reward of $-1$ per step, incentivizing it to want to reach the goal quickly. Since it's an episodic task, we set $\gamma = 1$. Additionally, we choose $\alpha = 1/2$ as our learning rate, and we choose an $\epsilon$-greedy action selection policy with $\epsilon = 0.1$. We set our initial values optimistically to encourage systematic exploration. Realize that a MC method would not be a great fit here, because many policies do not lead to termination. MC methods only learn when an episode terminates, and so a deterministic policy might get trapped and never learn a good policy in this windy grid world; e.g. if the agent takes the left action from the starting state, it would never terminate. Sarsa avoids this trap because it would learn such policies are bad \emph{during} the episode, and so it would switch policies and not get stuck.}
+\end{figure}
 
 \subsubsection{Q-learning: Off-policy TD Control}
 This algorithm was one of the early breakthroughs in RL, defined by the update rule
