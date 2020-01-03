@@ -2265,6 +2265,8 @@ Let's see how Sarsa behaves on an example.
 \begin{figure}[h]
   \centering
   \begin{tikzpicture}[scale=3/4]
+    \node at (9.5, 7.5) {$\color{orange} \pi^*$};
+    \node at (10.25, 7.5) {$\color{orange!50} + \epsilon$};
     \draw (0, 0) grid (10, 7);
     \node (s) at ( 0.5, 3.5 ) {S};
     \node (g) at ( 7.5, 3.5 ) {G};
@@ -2289,12 +2291,14 @@ Let's see how Sarsa behaves on an example.
 \end{figure}
 
 \subsubsection{Q-learning: Off-policy TD Control}
-This algorithm was one of the early breakthroughs in RL, defined by the update rule
+\paragraph{What is Q-learning?}
+Recent applications like learning to play Atari games, controlling traffic signals, or even automatically configuring web systems have all been built atop a single algorithm called Q-learning; there is a special relationship between Q-learning and the Bellman optimality equations. Q-learning is an \emph{online} algorithm. This algorithm was one of the early breakthroughs in RL, defined by the update rule
 \begin{equation}
   \label{eq: qlearningupdaterule}
   Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha \left[R_{t+1} + \gamma \max_a Q(S_{t+1}, a) - Q(S_t, A_t)\right].
 \end{equation}
-We call the learned action-value function $Q$ and it is meant to directly approximate $q_*$, the optimal action-value function, independent of the policy being followed. All that is required for correct convergence is that all state-action pairs continue to be \emph{updated}. Under this assumption of continual updating and a variant of the usual stochastic approximation conditions on the sequence of the step-size parameters, $Q$ learning converges almost surely to $q_*$. The $Q$-learning algorithm is presented here.
+We call the learned action-value function $Q$ and it is meant to directly approximate $q_*$, the optimal action-value function, independent of the policy being followed. All that is required for correct convergence is that all state-action pairs continue to be \emph{updated}. Under this assumption of continual updating and a variant of the usual stochastic approximation conditions on the sequence of the step-size parameters, $Q$ learning converges almost surely to $q_*$. The $Q$-learning procedure is presented in algorithm
+\ref{alg: qlearning}.
 \begin{algorithm}[h]
   \caption{Q-learning (off-policy TD control) for estimating $\pi \approx \pi_*$}
   \KwInput{Step size $\alpha \in (0, 1]$, and a small $\epsilon > 0$.}
@@ -2304,11 +2308,28 @@ We call the learned action-value function $Q$ and it is meant to directly approx
   \For{each step of the episode, until $S$ is terminal} {
     Choose $A$ from $S$ using policy derived from $Q$ (e.g. $\epsilon$-greedy)     \\
 Take action $A$, observe $R$, $S'$ \\
+\tcp{Key difference from Sarsa is in this next step.}
     $Q(S,A) \gets Q(S,A) + \alpha \left[R + \gamma \max_a Q(S', a) -       Q(S,A)\right]$ \\
     $S \gets S'$
   }
 }
+\label{alg: qlearning}
 \end{algorithm}
+
+\paragraph{The connection between Sarsa, Q-learning, and the Bellman Optimality Equations}
+Whereas Sarsa uses the value of the next state-action pair in its target, Q-learning on the other hand uses a \emph{max}. The connection goes way back to Dynamic Programming. Realize that the update for Sarsa looks suspiciously similar to the Bellman equation for the action-values; in fact it turns out Sarsa is a sample-based algorithm to \emph{solve} the Bellman equation for action-values.
+\begin{align*}
+  &\textrm{Sarsa:} \hspace{20pt} &Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha   \left({\color{orange}R_{t+1}} + {\color{purple} \gamma Q(S_{t+1}, A_{t+1})} - Q(S_t, A_t)\right) \\
+  &\textrm{Bellman optimality equation:} &q_\pi(s,a) = \sum_{s',r} \Pr(s', r | s, a) \left( {\color{orange} r} + {\color{purple}\gamma} \sum_{a'} \pi(a'|s') {\color{purple} q_\pi(s',a')}\right).
+\end{align*}
+
+Q-learning also solves the Bellman equation using samples from the environment, but instead of using the standard Bellman equation, Q-learning uses the Bellman's Optimality Equation for action-values.
+\begin{align*}
+  &\textrm{Q-learning:} \hspace{20pt} &Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha   \left({\color{orange}R_{t+1}} + {\color{purple} \gamma \max_{a'} Q(S_{t+1}, a')} - Q(S_t, A_t)\right) \\
+  &\textrm{Bellman optimality equation:} &q_*(s,a) = \sum_{s',r} \Pr(s', r | s, a) \left( {\color{orange} r} + {\color{purple}\gamma \max_{a'} q_\pi(s',a')}\right).
+\end{align*}
+
+This effectively means that Q-learning can directly learn $q_*$ instead of switching between policy improvement and policy evaluation steps! Sarsa is a sample-based version of policy iteration which uses the Bellman equations for action-values, that each depend on a fixed policy. Q-learning is a sample-based version of value iteration which iteratively applies the Bellman optimality equation. Applying the Bellman optimality equation strictly improves the value function, unless it's already optimal, and so value iteration continually improves as value function estimate, which eventually converges to the optimal solution.  For the same reason, Q-learning also converges to the optimal value function, so long as the agent continues to explore and samples all areas in the state-action space.
 
 \begin{figure}[h]
   \centering
