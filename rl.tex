@@ -2320,7 +2320,7 @@ Take action $A$, observe $R$, $S'$ \\
 Whereas Sarsa uses the value of the next state-action pair in its target, Q-learning on the other hand uses a \emph{max}. The connection goes way back to Dynamic Programming. Realize that the update for Sarsa looks suspiciously similar to the Bellman equation for the action-values; in fact it turns out Sarsa is a sample-based algorithm to \emph{solve} the Bellman equation for action-values.
 \begin{align*}
   &\textrm{Sarsa:} \hspace{20pt} &Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha   \left({\color{orange}R_{t+1}} + {\color{purple} \gamma Q(S_{t+1}, A_{t+1})} - Q(S_t, A_t)\right) \\
-  &\textrm{Bellman optimality equation:} &q_\pi(s,a) = \sum_{s',r} \Pr(s', r | s, a) \left( {\color{orange} r} + {\color{purple}\gamma} \sum_{a'} \pi(a'|s') {\color{purple} q_\pi(s',a')}\right).
+  &\textrm{Bellman equation:} &q_\pi(s,a) = \sum_{s',r} \Pr(s', r | s, a) \left( {\color{orange} r} + {\color{purple}\gamma} \sum_{a'} \pi(a'|s') {\color{purple} q_\pi(s',a')}\right).
 \end{align*}
 
 Q-learning also solves the Bellman equation using samples from the environment, but instead of using the standard Bellman equation, Q-learning uses the Bellman's Optimality Equation for action-values.
@@ -2438,5 +2438,59 @@ With exception to the modification of the update rule, we follow the schema of Q
 where $A_{t+1} \sim \pi(a' | S_{t+1})$, i.e. the next action is sampled from policy $\pi$. But in general it might use a different policy from the target policy $\pi$ to generate behavior, i.e. the expectation over actions is computed independently of the action actually selected in the next state. In such cases, it becomes an off-policy algorithm, and we don't even need importance sampling, since the expectation is taken over the target policy in the update target! Another interesting note is that we could take $\pi$ to be the greedy policy and a behavior policy that is more exploratory, for example; in this case, Expected Sarsa is exactly Q-learning. It is in this sense that Expected Sarsa subsumes and generalizes Q-learning while reliably improving over Sarsa. Its true the Expected Sarsa incurs a higher computational expense, but it in general dominates both of the other well-known TD control algorithms.
 
 \subsubsection{Summary of TD}
-The TD control algorithms are based on Bellman equations; we learned about three of them. Sarsa uses a sample-based version of the Bellman equation, and it learns $q_\pi$. Q-learning uses the Bellman optimality equation, whence it learns $q_*$. Expected Sarsa uses the same Bellman equation as Sarsa, but samples it differently: it takes an expectation over next action values. Whereas Sarsa is an on-policy algorithm that learns the action values for the policy its currently following, Q-learning is an off-policy algorithm that learns the optimal action values. Expected Sarsa is both an on-policy and off-policy algorithm that can learn the action values for \emph{any} policy!. Sarsa can do better than Q-learning when performance is measured online, because on-policy control methods account for their own exploration; e.g. in cliff-world we saw that Q-learning was susceptible to falling off the cliff as it attempted to maintain continual exploration whilst generally following an optimal policy right along the cliff edge. On the other hand, Sarsa learned the longer but safer path that rarely fell off the cliff, which resulted in higher returns. We can improve Sarsa using Expected Sarsa, where the latter in general outperforms the former: this is because Expected Sarsa mitigates the variance due to its own policy. Expected Sarsa takes its expectation over the next action. 
+The TD control algorithms are based on Bellman equations; we learned about three of them. Sarsa uses a sample-based version of the Bellman equation, and it learns $q_\pi$. Q-learning uses the Bellman optimality equation, whence it learns $q_*$. Expected Sarsa uses the same Bellman equation as Sarsa, but samples it differently: it takes an expectation over next action values. Whereas Sarsa is an on-policy algorithm that learns the action values for the policy its currently following, Q-learning is an off-policy algorithm that learns the optimal action values. Expected Sarsa is both an on-policy and off-policy algorithm that can learn the action values for \emph{any} policy!. Sarsa can do better than Q-learning when performance is measured online, because on-policy control methods account for their own exploration; e.g. in cliff-world we saw that Q-learning was susceptible to falling off the cliff as it attempted to maintain continual exploration whilst generally following an optimal policy right along the cliff edge. On the other hand, Sarsa learned the longer but safer path that rarely fell off the cliff, which resulted in higher returns. We can improve Sarsa using Expected Sarsa, where the latter in general outperforms the former: this is because Expected Sarsa mitigates the variance due to its own policy. Expected Sarsa takes its expectation over the next action.
+
+\subsection{Tabular Methods}
+\subsubsection{Models and Planning} A \emph{model} of the environment is anything an agent can use to predict how the environment will respond to its actions. Given a state and an action, a model will produce a prediction of the resulting next state and next reward. Models can be \emph{stochastic}, in which case there can be several possible next states and next rewards, each with some probability of occurring. There is a particular family of models that produce descriptions of all possibilities and their probabilities, and we call these \emph{distribution models}; other \emph{sample models} simply produce one of the possibilities, sampled according to the probabilities. Whereas a distribution model would produce all possible sums and their probabilities of occurring, a sample model would produce an individual sum drawn according to the probability distribution. Realize that DP assumes a distribution model in using $\Pr(s',r|s,a)$, the four-argument transition function describing the MDP's dynamics. On the other hand, when we discussed a Blackjack example previously, this was a sample based model. Note that there are many applications where writing a compute program to procure a sample is much easier than computing the transition dynamics, e.g. the sum of a dozen dice rolls.
+
+\paragraph{Using models to simulate the environment} We can mimic or simulate experience if we have a model. Given a starting state and a policy, a sample model could produce an entire episode. On the other hand, given the same inputs a distribution model could generate all possible episodes \emph{and} their probabilities. Either way, the model \emph{simulates} the environment and produces \emph{simulated experience}.
+
+\paragraph{Planning} Planning refers to any computational process that takes a model as input and produces or improves upon a policy for interacting with the modeled environment, i.e.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node (model) at (0, 0) {model};
+    \node (policy) at (4, 0) {policy};
+    \draw[->, ultra thick] (model) -- (policy);
+    \node at (2, 0.25) {planning};
+  \end{tikzpicture}
+\end{figure}
+
+\paragraph{State-space planning}
+In AI, there are two distinct approaches to planning according to the aforementioned definition. \emph{State-space planning} is a search through the state space for an optimal policy or an optimal path to a goal; actions cause transitions from state-to-state, and value functions are computed over states. \emph{Plan-space planning} is instead a search through the space of plans, where operators transform one plan into another, and value functions, if any are defined, are defined over the space of plans. Note that plan-space planning includes evolutionary methods. Since plan-space methods are difficult to apply efficiently to stochatic sequential decision problems which are at the root of RL, we don't focus on them further.
+
+\paragraph{A unified view} All state-space planning methods share a common structure: (i) all state-space planning methods involve computing value functions as a key intermediary step toward improving the policy, and (ii) they compute value functions by updates or backup operations applied to simulated experience.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node (model) at (0, 0) {model};
+    \node (simexp) at (4, 0) {$\substack{\textrm{simulated}\\         \textrm{experience}}$};
+    \node (values) at (8, 0) {values};
+    \node (policy) at (12,0) {policy};
+    \draw[->, ultra thick] (model) -- (simexp);
+    \draw[->, ultra thick] (simexp) -- (values);
+    \draw[->, ultra thick] (values) -- (policy);
+    \node at (6, 0.25) {\tiny backups};
+  \end{tikzpicture}
+\end{figure}
+Realize that DP clearly fits this structure: in each iteration we make a sweep through the spaces of states, generating for each state the distribution of possible transitions. Then, each distribution is used to compute a backed-up value (update target) and update the state's estimated value.
+\paragraph{Comparing planning methods with learning methods}
+At the heart of both learning and planning methods is the estimation of value functions by backing-up update operations. The key difference is that whereas planning uses \emph{simulated} experience generated from a model, learning methods use real experience generated by the environment. In many cases, a learning algorithm can be substituted for the key update step of a planning method! This follows from the fact that learning methods only require experience as input, and in many cases they can be applied to simulated experience just as well as to real experience. Consider a \emph{random-sample one-step tabular Q-planning} procedure below, which converges to the optimal policy for the model under the conditions that (i) each state-action pair must be selected an infinite number of times in the first step and (ii) $\alpha$ must decrease appropriately over time.
+\begin{algorithm}[h]
+  \caption{Random-sample one-step tabular Q-planning}
+  \For{ever, without termination} {
+    Select a state, $S \in \mathcal S$, and an action, $A \in \mathcal A(S)$, at     random \\
+Send $S,A$ to a sample model, and obtain a sample next reward, $R$, and a sample next state $S'$\\
+Apply one-step tabular $Q$-learning to $S, A, R, S'$:
+\[
+  Q(S,A) \gets Q(S,A) + \alpha \left[ R + \gamma \max_a Q(S', a) - Q(S,A)\right].
+\]
+}
+\end{algorithm}
+
+\paragraph{The benefit of planning in small, incremental steps} This enables planning to be interrupted or redirected at any time with little wasted computation, and this appears to be a key requirement for efficiently intermixing planning with acting and with learning of the model. In fact, planning in very small steps may be the most efficient approach even on pure planning problems, if the problem is too large to be solved exactly.
+
+\subsubsection{Dyna: Integrated Planning, Acting, and Learning}
+\subsubsection{When the Model is Wrong}
+
 \end{document}
