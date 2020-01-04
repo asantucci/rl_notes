@@ -2491,6 +2491,26 @@ Apply one-step tabular $Q$-learning to $S, A, R, S'$:
 \paragraph{The benefit of planning in small, incremental steps} This enables planning to be interrupted or redirected at any time with little wasted computation, and this appears to be a key requirement for efficiently intermixing planning with acting and with learning of the model. In fact, planning in very small steps may be the most efficient approach even on pure planning problems, if the problem is too large to be solved exactly.
 
 \subsubsection{Dyna: Integrated Planning, Acting, and Learning}
+\paragraph{What happens when planning is done online} While planning online and interacting with the environment, a number of interesting issues arise. For example, new information gained from the interaction may change the model and thereby interact with planning: it may be desireable to customize the planning process in some way to the states or decisions currently under consideration, or expected in the near future. Another issue is that if decision making and model learning are both computationally-intensive processes, then the available computational resources may need to be divided among them. Dyna-Q begins to explore these issues; it is a simple architecture which integrates the majore functions needed in an online planning agent.
+
+\paragraph{Direct and indirect RL} Within a planning agent, there are at least two roles for real experience: it can be used to improve the model (to make it more accurately match the real environment), i.e. \emph{model learning}, and it can be used to directly improve the value function and policy using the kinds of RL methods we've previously discussed, i.e. \emph{direct reinforcement learning}. We can diagram the possible relationships between experience, model, values, and policy as follows.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node (vp) at (0, 0) {value/policy};
+    \node (exp) at (2, -2) {experience};
+    \node (mdl) at (-2,-2) {model};
+    \draw[->, ultra thick] (vp) edge[bend left] node[right] {acting} (exp);
+    \draw[->, ultra thick] (exp) edge[bend left] node[below] {$\substack{\textrm{model} \\ \textrm{learning}}$} (mdl);
+    \draw[->, ultra thick] (mdl) edge[bend left] node[left] {planning} (vp);
+    \draw[->, ultra thick] (exp) edge[bend left] node[right] {$\substack{\textrm{direct} \\ \textrm{RL}}$} (vp);
+\end{tikzpicture}
+\caption{\footnotesize Each arrow shows a relationship of influence and presumed improvement. Note how experience can improve value functions and policies either directly or indirectly via the model. It is the latter which is sometimes known as \emph{indirect reinforcement learning}.}
+\end{figure}
+
+Dyna-Q inclues all of the processes shown in the diagram above - planning, acting, model-free learning, and direct RL - all occurring continually. In particular: the planning method is the random-sample one-step tabular planning method presented previously; the direct RL method is one-step tabular Q-learning; the model-learning method is also table-based and assumes the environment is deterministic, where after each transition $S_t, A_t \longrightarrow R_{t+1}, S_{t+1}$ the model records in its table entry for $S_t, A_t$ the prediction that $R_{t+1}$, $S_{t+1}$ will deterministically follow. Thus, if the model is queried with a state-action pair that has been experienced before, it simply returns the last-observed next state and next reward as its prediction. During planning, the Q-planning algorithm randomly samples only from state-action pairs that have previously been experienced, so the model is never queried with a pair about which it has no information.
+\paragraph{Tradeoffs of direct vs. indirect methods} Indirect methods often make fuller use of a limited amount of experience and thus achieve a better policy with fewer environmental interactions. On the other hand, direct methods are much simpler and are not affected by biases in the design of the model.
+
 \subsubsection{When the Model is Wrong}
 
 \end{document}
