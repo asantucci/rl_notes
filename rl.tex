@@ -2519,9 +2519,10 @@ Dyna-Q inclues all of the processes shown in the diagram above - planning, actin
   \begin{tikzpicture}
     \node[draw,rectangle] (env) at (0, -2) {Environment};
     \node[draw,rectangle] (pvfnc) at (0, 2) {Policy/value functions};
-    \draw[<->, ultra thick, blue!50, line width = 2mm] (env) -- (pvfnc); 
     \node[draw,rectangle] (mdl) at (3, -1.5) {Model};
     \node[draw,rounded rectangle] (realexp) at (0, 0) {$\substack{\textrm{real}         \\ \textrm{experience}}$};
+    \draw[->, ultra thick, blue!50, line width = 2mm] (realexp) -- (pvfnc); 
+    \draw[->, ultra thick, blue!50, line width = 2mm] (realexp) -- (env); 
     \node[draw,rounded rectangle] (simexp) at (3, 0.5)         {$\substack{\textrm{simulated} \\ \textrm{experience}}$};
     \node (directrlupdate) at (-3, 0.5) {$\substack{\textrm{direct RL} \\         \textrm{update}}$};
 \draw[->] (realexp) -- (mdl);
