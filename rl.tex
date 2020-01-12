@@ -2441,6 +2441,21 @@ where $A_{t+1} \sim \pi(a' | S_{t+1})$, i.e. the next action is sampled from pol
 The TD control algorithms are based on Bellman equations; we learned about three of them. Sarsa uses a sample-based version of the Bellman equation, and it learns $q_\pi$. Q-learning uses the Bellman optimality equation, whence it learns $q_*$. Expected Sarsa uses the same Bellman equation as Sarsa, but samples it differently: it takes an expectation over next action values. Whereas Sarsa is an on-policy algorithm that learns the action values for the policy its currently following, Q-learning is an off-policy algorithm that learns the optimal action values. Expected Sarsa is both an on-policy and off-policy algorithm that can learn the action values for \emph{any} policy!. Sarsa can do better than Q-learning when performance is measured online, because on-policy control methods account for their own exploration; e.g. in cliff-world we saw that Q-learning was susceptible to falling off the cliff as it attempted to maintain continual exploration whilst generally following an optimal policy right along the cliff edge. On the other hand, Sarsa learned the longer but safer path that rarely fell off the cliff, which resulted in higher returns. We can improve Sarsa using Expected Sarsa, where the latter in general outperforms the former: this is because Expected Sarsa mitigates the variance due to its own policy. Expected Sarsa takes its expectation over the next action.
 
 \subsection{Tabular Methods}
+\paragraph{What is a model?} Sometimes, we make decisions without thinking too much about them: such as driving to work. Other times, we sit and imagine many possible scenarios based on our understanding of the world; we can use these imagined outcomes to decide what to do or not to do. E.g. if we carry a fragile object with one hand, we can imagine scenarios where it falls and breaks and we make choices accordingly (use two hands!). We've seen sample-based methods like TD which learn only from sampled experience, and we've also seen methods like DP which plan by using complete information about how the environment dynamics work, without having to make decisions. It would be even better if we could obtain an intermediate method that can leverage the best of both extremes. This section introduces the Dyna architecture. In particular, models are used to sore knowledge about the dynamics.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[draw,rectangle] (model) at (0, 0) {Model};
+    \node (state) at (-1, 0.5) {State};
+    \node (action) at (-1, -0.5) {Action};
+    \node (reward) at (1, 0.5) {Reward};
+    \node (nextstate) at (1, -0.5) {Next state};
+    \draw[->] (state) -- (model);
+    \draw[->] (action) -- (model);
+    \draw[->] (model) -- (reward);
+    \draw[->] (model) -- (nextstate);
+  \end{tikzpicture}
+\end{figure}
 \subsubsection{Models and Planning} A \emph{model} of the environment is anything an agent can use to predict how the environment will respond to its actions. Given a state and an action, a model will produce a prediction of the resulting next state and next reward. Models can be \emph{stochastic}, in which case there can be several possible next states and next rewards, each with some probability of occurring. There is a particular family of models that produce descriptions of all possibilities and their probabilities, and we call these \emph{distribution models}; other \emph{sample models} simply produce one of the possibilities, sampled according to the probabilities. Whereas a distribution model would produce all possible sums and their probabilities of occurring, a sample model would produce an individual sum drawn according to the probability distribution. Realize that DP assumes a distribution model in using $\Pr(s',r|s,a)$, the four-argument transition function describing the MDP's dynamics. On the other hand, when we discussed a Blackjack example previously, this was a sample based model. Note that there are many applications where writing a compute program to procure a sample is much easier than computing the transition dynamics, e.g. the sum of a dozen dice rolls.
 
 \paragraph{Using models to simulate the environment} We can mimic or simulate experience if we have a model. Given a starting state and a policy, a sample model could produce an entire episode. On the other hand, given the same inputs a distribution model could generate all possible episodes \emph{and} their probabilities. Either way, the model \emph{simulates} the environment and produces \emph{simulated experience}.
@@ -2536,6 +2551,46 @@ Dyna-Q inclues all of the processes shown in the diagram above - planning, actin
 \end{tikzpicture}
 \caption{\footnotesize The central column represents the basic interaction between agent and environment, giving rise to the trajectory of real experience. The arrow on the left represents direct RL operating on real experience to improve the value function and the policy. On the right are model-based processes; the model is learned from real experience and gives rise to simulated experience. We use the term \emph{search control} to refer to the process that selects the starting states and actions for the simulated experiences generated by the model. Lastly, planning is achieved by applying reinforcement learning methods to the simulated experiences just as if they had really happened. It is typical that the same RL method is used for both learning from real experience and planning from simulated experience; the RL method is thus the ``final common path'' for both learning and planning. Learning and planning are deeply integrated in the sense that they share almost all the same machinery, differing only in the source of their experience.}
 \end{figure}
+
+Theoretically, planning, acting, model-learning, and direct RL can all occur simultaneously and in parallel in Dyna agents. For concreteness and implementation on a serial computer, we specify an ordering of computations: we save planning for last and assume that in each time step there is sufficient time in each step after acting, model-learning, and direct RL to complete $n$-iterations of the Q-planning algorithm. Below, $\texttt{Model}(s,a)$ denotes the contents of the predicted next state and reward for state action pair $(s,a)$.
+
+\begin{algorithm}[h]
+  \caption{Tabular Dyna-Q}
+  Initialize $Q(s,a)$ and $\texttt{Model}(s,a)$ for all $s \in \mathcal S$ and   $a \in \mathcal A(s)$. \\
+\For{ever} {
+  $S \gets $ current (non-terminal) state \\
+  $A \gets \epsilon-\textrm{greedy}(S,Q)$ \\
+  Take action $A$; observe resultant reward $R$, and state, $S$' \\
+  $Q(S,A) \gets Q(S,A) + \alpha \left[ R + \gamma \max_a Q(S', a) -     Q(S,A)\right]$ \tcp{Direct RL}
+$\texttt{Model}(S,A) \gets R, S'$ (assuming deterministic environment) \tcp{Model-learning}
+\For{$i=1,\ldots,n$}{
+  \tcp{Planning}
+  $S \gets $ random previously observed state \\
+  $A \gets $ random action previously taken in $S$ \\
+  $R, S' \gets \texttt{Model}(S,A)$ \\
+  $Q(S,A) \gets Q(S,A) + \alpha \left[ R + \gamma \max_a Q(S', a) - Q(S,A)\right]$
+}
+}
+\end{algorithm}
+If we omit the model-learning and planning steps, we recover one-step tabular Q-learning.
+
+\paragraph{Dyna Maze} Consider the simple maze shown below.
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \draw[fill,gray!50] (2, 2) rectangle (3, 5);
+    \draw[fill,gray!50] (5, 1) rectangle (6, 2);
+    \draw[fill,gray!50] (7, 3) rectangle (8, 6);
+    \node at (0.5, 3.5) {S};
+    \node at (8.5, 5.5) {G};
+    \draw[step=1.0,black,thin] (0,0) grid (9, 6);    
+  \end{tikzpicture}
+  \caption{\footnotesize In each of the 47 states there are four actions: \texttt{up, down, right, } and \texttt{left}, which take the agent deterministically to the corresponding neighboring states, except when movement is blocked by an obstacle or the edge of the maze, in which case the agent remains stationary. Reward is zero on all transitions, except those into the goal state, on which it is $+1$. After reaching the goal state $G$, the agent returns to the start state $S$ to begin a new episode. The task is episodic, and we will use $\gamma = 0.95$.}
+\end{figure}
+
+We can apply various Dyna-Q agents to this maze task, setting all initial action-values to zero, with step-size parameter $\alpha = 0.1$ and exploration parameter $\epsilon = 0.1$, and further breaking ties arbitrarily when selecting among greedy actions. The agents vary in the number of planning steps $n$ they performed at each real step. We see that on this problem the agents that use more planning are able to reach $\epsilon$-optimal performance faster than those that do not utilize planning. Without planning, each episode only adds one additional step to the policy, whereas with planning although only one step is learned during the first episode but an extensive policy can be learned during the second episode, reaching almost as far back as the start state.
+
+
 
 \subsubsection{When the Model is Wrong}
 
