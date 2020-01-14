@@ -2597,11 +2597,12 @@ Theoretically, planning, acting, model-learning, and direct RL can all occur sim
   $Q(S,A) \gets Q(S,A) + \alpha \left[ R + \gamma \max_a Q(S', a) -     Q(S,A)\right]$ \tcp{Direct RL}
 $\texttt{Model}(S,A) \gets R, S'$ (assuming deterministic environment) \tcp{Model-learning}
 \For{$i=1,\ldots,n$}{
-  \tcp{Planning}
-  $S \gets $ random previously observed state \\
-  $A \gets $ random action previously taken in $S$ \\
-  $R, S' \gets \texttt{Model}(S,A)$ \\
-  $Q(S,A) \gets Q(S,A) + \alpha \left[ R + \gamma \max_a Q(S', a) - Q(S,A)\right]$
+  \tcp{Planning...}
+  $S \gets $ random previously observed state \hspace{105pt}\tcp{Search...}
+  $A \gets $ random action previously taken in $S$ \hspace{88pt}\tcp{...Control}
+  $R, S' \gets \texttt{Model}(S,A)$   \hspace{196pt}\tcp{Model Query}
+  $Q(S,A) \gets Q(S,A) + \alpha \left[ R + \gamma \max_a Q(S', a) - Q(S,A)\right]$    \hspace{10pt} \tcp{Value Update}
+
 }
 }
 \end{algorithm}
