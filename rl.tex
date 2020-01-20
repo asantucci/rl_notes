@@ -2650,4 +2650,16 @@ where $r$ is the reward from the model, $\tau$ is the amount of time it's been s
 It is straightforward to integrate incremental planning methods with acting and model-learning. Planning, acting, and model-learning interact in a circular fashion, each producing what the other needs to improve. The most natural approach is to allow all processes to procede asynchronously and in parallel.
 One dimension in variation among state-space planning methods is the size of the update. At one end of the spectrum, we have one-step sample updates as in Dyna.
 
+From state-values to state-action values:
+\begin{align*}
+  V(S_t) \gets V(S_t) + \alpha \left[ \hat G_t - V(S_t)\right] \leadsto Q(S_t, A_t) \gets Q(S_t, A_t) + \alpha \left[ \hat G_t - Q(S_t, A_t)\right]
+\end{align*}
+where we can define a variety of update rules:
+\begin{align*}
+  &\textrm{Sarsa} &\hat G_t &= R_{t+1} + \gamma Q(S_{t+1}, A_{t+1}) \\
+  &\textrm{Q-Learning} &\hat G_t &= R_{t+1} + \gamma \max_{a'} Q(S_{t+1}, a') \\
+  &\textrm{Expected Sarsa} &\hat G_t &= R_{t+1} + \gamma \sum_{a'} \pi(a'|S_{t+1}) Q(S_{t+1}, a')
+\end{align*}
+Sarsa is an on-policy algorithm, whereas Q-learning is off-policy: it estimates the value function for the optimal policy. Expected Sarsa can be an on-or-off policy algorithm, because the expectation can be conditioned on any policy; Q-learning is a special case of expected Sarsa.
+
 \end{document}
